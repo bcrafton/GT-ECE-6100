@@ -126,6 +126,54 @@ void print_stats(){
 /*********************************************************************
  * Trace Analysis (Students need to write this function)
  *********************************************************************/
+
+uint64_t unique_pcs[100000];
+
+bool unique_pc(uint64_t pc) 
+{
+  uint32_t i;
+  for(i=0; i<stat_unique_pc; i++)
+  {
+    if(unique_pcs[i] == pc)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
 void analyze_trace_record(Trace_Rec *t){
     assert(t);
+
+    //printf("%lu %u %lu\n", t->inst_addr, t->opcode, stat_unique_pc);
+
+    //stat_num_inst++;
+    stat_optype_dyn[t->opcode]++;  
+
+    switch(t->opcode)
+    {
+      case OP_ALU:
+        stat_num_cycle += 1;
+        break;
+      case OP_LD:
+        stat_num_cycle += 2;
+        break;
+      case OP_ST:
+        stat_num_cycle += 2;
+        break;
+      case OP_CBR:
+        stat_num_cycle += 3;
+        break;
+      case OP_OTHER:
+        stat_num_cycle += 1;
+        break;
+      default:
+        assert(0);
+    }
+
+    if(unique_pc(t->inst_addr))
+    {
+      unique_pcs[stat_unique_pc] = t->inst_addr;
+      stat_unique_pc++;
+    }
 }
