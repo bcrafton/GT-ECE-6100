@@ -130,7 +130,7 @@ void pipe_cycle_WB(Pipeline *p){
     if(p->pipe_latch[MEM_LATCH][ii].valid){
       p->stat_retired_inst++;
       if(p->pipe_latch[MEM_LATCH][ii].op_id >= p->halt_op_id){
-	p->halt=true;
+	      p->halt=true;
       }
     }
   }
@@ -150,16 +150,61 @@ void pipe_cycle_MEM(Pipeline *p){
 void pipe_cycle_EX(Pipeline *p){
   int ii;
   for(ii=0; ii<PIPE_WIDTH; ii++){
-    p->pipe_latch[EX_LATCH][ii]=p->pipe_latch[ID_LATCH][ii];
+
+    // if the prev stage is stalled, whatever here is invalid.
+    if(p->pipe_latch[ID_LATCH][ii].stall) {
+      p->pipe_latch[EX_LATCH][ii].valid = false;
+    }
+    else {
+      p->pipe_latch[EX_LATCH][ii]=p->pipe_latch[ID_LATCH][ii];
+    }
+
   }
 }
 
 //--------------------------------------------------------------------//
 
+bool check_data_dependence(Pipeline_Latch* l1, Pipeline_Latch* l2)
+{
+  bool src1_hazard = (l1->tr_entry.src1_reg == l2->tr_entry.dest) &&
+                     l1->tr_entry.src1_needed &&
+                     l2->tr_entry.dest_needed &&
+                     l1->valid &&
+                     l2->valid;
+
+  bool src2_hazard = (l1->tr_entry.src2_reg == l2->tr_entry.dest) &&
+                     l1->tr_entry.src2_needed &&
+                     l2->tr_entry.dest_needed &&
+                     l1->valid &&
+                     l2->valid;
+
+  return src1_hazard || src2_hazard;
+  
+  //if(l1->tr_entry.op_type == OP_ALU){}
+}
+
 void pipe_cycle_ID(Pipeline *p){
-int ii;
+
+  int ii;
+  int j;
+  bool stall;
+
   for(ii=0; ii<PIPE_WIDTH; ii++){
-    p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
+        
+    if(!p->pipe_latch[ID_LATCH][ii].stall) {
+      p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
+      // not sure if the right way to do this. how else to communicate we need to stall next cycle.
+      // could say op_id of when we stalled.
+      p->pipe_latch[FE_LATCH][ii].valid = 0;
+    }
+
+    // this will need to account for instructions ahead, but in other pipes.
+    // will use op_id.
+    p->pipe_latch[ID_LATCH][ii].stall = false;
+    for(j=0; j<PIPE_WIDTH; j++){
+      p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[EX_LATCH][j]) );
+      p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[MEM_LATCH][j]) );
+    }
 
     if(ENABLE_MEM_FWD){
       // todo
@@ -179,14 +224,24 @@ void pipe_cycle_FE(Pipeline *p){
   bool tr_read_success;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-    pipe_get_fetch_op(p, &fetch_op);
 
-    if(BPRED_POLICY){
-      pipe_check_bpred(p, &fetch_op);
+    // we should only pull an instruction if previous one was flopped forward
+    // maybe we do need a better way to do this
+    // not sure if valid NEEDs to be used for something else.
+
+    //printf("valid = %d\n", p->pipe_latch[FE_LATCH][ii].valid);
+
+    if (!p->pipe_latch[FE_LATCH][ii].valid) {
+      pipe_get_fetch_op(p, &fetch_op);
+
+
+      if(BPRED_POLICY){
+        pipe_check_bpred(p, &fetch_op);
+      }
+      
+      // copy the op in FE LATCH
+      p->pipe_latch[FE_LATCH][ii]=fetch_op;
     }
-    
-    // copy the op in FE LATCH
-    p->pipe_latch[FE_LATCH][ii]=fetch_op;
   }
   
 }
