@@ -201,7 +201,17 @@ void pipe_cycle_ID(Pipeline *p){
     // this will need to account for instructions ahead, but in other pipes.
     // will use op_id.
     p->pipe_latch[ID_LATCH][ii].stall = false;
-    for(j=0; j<PIPE_WIDTH; j++){
+    for(j=0; j<PIPE_WIDTH; j++) {
+    
+      // account for super scalar. 
+      // using > so that it cannot be the same pipe, and it cannot be less than because then it wouldnt be dependent.
+      // although this pipeline isnt ooo, so maybe op_id is not important. 
+      // and could just use the pipeline iteration number
+
+      if (p->pipe_latch[ID_LATCH][ii].op_id > p->pipe_latch[ID_LATCH][j].op_id) {
+        p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[ID_LATCH][j]) );
+      }
+
       p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[EX_LATCH][j]) );
       p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[MEM_LATCH][j]) );
     }
