@@ -164,6 +164,8 @@ void pipe_cycle_EX(Pipeline *p){
 
 //--------------------------------------------------------------------//
 
+static uint32_t stalls;
+
 bool check_data_dependence(Pipeline_Latch* l1, Pipeline_Latch* l2)
 {
   bool src1_hazard = (l1->tr_entry.src1_reg == l2->tr_entry.dest) &&
@@ -178,16 +180,51 @@ bool check_data_dependence(Pipeline_Latch* l1, Pipeline_Latch* l2)
                      l1->valid &&
                      l2->valid;
 
+
+  if (src1_hazard || src2_hazard) {
+
+    // this number can not be incremented here because of double stalls.
+    //stalls++;
+
+/*
+    printf("stall count= %d current: %lx %x %x %x %x %x %x %x stalled by: %lx %x %x %x %x %x %x %x\n", 
+      stalls,
+
+      l1->op_id,  
+      l1->tr_entry.op_type,
+      l1->tr_entry.dest,
+      l1->tr_entry.dest_needed,
+      l1->tr_entry.src1_reg,
+      l1->tr_entry.src1_needed,
+      l1->tr_entry.src2_reg,
+      l1->tr_entry.src2_needed,
+
+      l2->op_id,  
+      l2->tr_entry.op_type,
+      l2->tr_entry.dest,
+      l2->tr_entry.dest_needed,
+      l2->tr_entry.src1_reg,
+      l2->tr_entry.src1_needed,
+      l2->tr_entry.src2_reg,
+      l2->tr_entry.src2_needed
+      );
+*/
+
+  }
+
+
   return src1_hazard || src2_hazard;
   
   //if(l1->tr_entry.op_type == OP_ALU){}
 }
 
+// is it fine to to stage by stage and pipe by pipe?
+// rather than pipe by pipe and stage by stage.
+
 void pipe_cycle_ID(Pipeline *p){
 
   int ii;
   int j;
-  bool stall;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
         
@@ -208,12 +245,19 @@ void pipe_cycle_ID(Pipeline *p){
       // although this pipeline isnt ooo, so maybe op_id is not important. 
       // and could just use the pipeline iteration number
 
+      // we dont want to double count stalls here. and we want to make our numbers equal
+
       if (p->pipe_latch[ID_LATCH][ii].op_id > p->pipe_latch[ID_LATCH][j].op_id) {
         p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[ID_LATCH][j]) );
       }
 
       p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[EX_LATCH][j]) );
       p->pipe_latch[ID_LATCH][ii].stall |= check_data_dependence( &(p->pipe_latch[ID_LATCH][ii]), &(p->pipe_latch[MEM_LATCH][j]) );
+    }
+
+    if (p->pipe_latch[ID_LATCH][ii].stall) {  
+      stalls++;
+      //printf("exp %ld curr %ld\n", p->stat_num_cycle, stalls + p->stat_retired_inst);
     }
 
     if(ENABLE_MEM_FWD){
