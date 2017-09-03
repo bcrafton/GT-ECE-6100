@@ -133,8 +133,6 @@ typedef struct register_map{
 
 static register_map_t reg_map;
 
-// could do this for wb, mem, ex, and id
-// or could just do it once.
 void update_regmap()
 {
   int i;
@@ -163,43 +161,6 @@ void update_regmap()
     }
   }
 }
-
-/*
-void allocate_reg(Pipeline *p, )
-{
-  int i;
-  for(i=0; i<PIPE_WIDTH; i++)
-  {
-    uint8_t dest_needed = p->pipe_latch[ID_LATCH][i].tr_entry.dest_needed;
-    uint8_t dest =        p->pipe_latch[ID_LATCH][i].tr_entry.dest;
-    uint8_t stall =       p->pipe_latch[ID_LATCH][ii].stall;
-
-    if(!stall && dest_needed){
-      reg_map.stage[dest] = ID_LATCH;
-      reg_map.pipe[dest] = i;
-    }
-  }
-}
-*/
-
-/*
-bool reg_avail(Pipeline *p, uint8_t reg)
-{
-  if (!reg_map.inflight[reg])
-  {
-    return true;
-  }
-  
-  Latch_Type stage = reg_map.stage[reg];
-  uint8_t pipe = reg_map.pipe[reg];
-  
-  bool forward_ex = !p->pipe_latch[stage][pipe].tr_entry.cc_read && stage = EX_LATCH;
-  bool forward_mem = stage >= MEM_LATCH;
-
-  return forward_ex || forward_mem;
-
-}
-*/
 
 void pipe_cycle_WB(Pipeline *p){
   int ii;  
@@ -251,8 +212,6 @@ void pipe_cycle_EX(Pipeline *p){
 
 //--------------------------------------------------------------------//
 
-static uint32_t stalls;
-
 void pipe_cycle_ID(Pipeline *p){
 
   int ii;
@@ -267,70 +226,48 @@ void pipe_cycle_ID(Pipeline *p){
   uint8_t src2;
   uint8_t src2_needed;
 
-  uint8_t valid;
-
-  uint8_t dest;
-  uint8_t dest_needed;
-
-
   update_regmap();
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
         
     if(!p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
-
-      // not sure if the right way to do this. how else to communicate we need to stall next cycle.
-      // could say op_id of when we stalled.
       p->pipe_latch[FE_LATCH][ii].valid = 0;
     }
+
     src1 = p->pipe_latch[ID_LATCH][ii].tr_entry.src1_reg;
     src1_needed = p->pipe_latch[ID_LATCH][ii].tr_entry.src1_needed;
 
     src2 = p->pipe_latch[ID_LATCH][ii].tr_entry.src2_reg;
     src2_needed = p->pipe_latch[ID_LATCH][ii].tr_entry.src2_needed;
 
-    //valid = p->pipe_latch[ID_LATCH][ii].valid;
-
-    //dest = p->pipe_latch[ID_LATCH][ii].tr_entry.dest;
-    //dest_needed = p->pipe_latch[ID_LATCH][ii].tr_entry.dest_needed;
-
     src1_hazard = reg_map.inflight[src1] && src1_needed;
     src2_hazard = reg_map.inflight[src2] && src2_needed;
 
     if(ENABLE_EXE_FWD){
-
       if (src1_hazard) {
-
         Latch_Type stage = reg_map.stage[src1];
         uint8_t pipe = reg_map.pipe[src1];
         bool forward_ex = !p->pipe_latch[stage][pipe].tr_entry.mem_read && (stage == EX_LATCH);
         
         if (forward_ex) src1_hazard = false; 
-
       }
 
       if (src2_hazard) {
-
         Latch_Type stage = reg_map.stage[src2];
         uint8_t pipe = reg_map.pipe[src2];
         bool forward_ex = !p->pipe_latch[stage][pipe].tr_entry.mem_read && (stage == EX_LATCH);
 
         if (forward_ex) src2_hazard = false;                
-
       }
-
     }
 
     if(ENABLE_MEM_FWD){
-
       if (src1_hazard) {
-
         Latch_Type stage = reg_map.stage[src1];
         bool forward_mem = stage == MEM_LATCH;
 
         if (forward_mem) src1_hazard = false;           
-    
       }
 
       if (src2_hazard) {
@@ -341,23 +278,18 @@ void pipe_cycle_ID(Pipeline *p){
         if (forward_mem) src2_hazard = false;             
 
       }
-
     }
 
     p->pipe_latch[ID_LATCH][ii].stall = src1_hazard || src2_hazard;
 
-    if (p->pipe_latch[ID_LATCH][ii].valid && 
-        p->pipe_latch[ID_LATCH][ii].tr_entry.dest_needed &&
+    if (p->pipe_latch[ID_LATCH][ii].tr_entry.dest_needed &&
         !p->pipe_latch[ID_LATCH][ii].stall) {
 
-      reg_map.inflight[ p->pipe_latch[ID_LATCH][ii].tr_entry.dest ] = true;
+      reg_map.inflight[ p->pipe_latch[ID_LATCH][ii].tr_entry.dest ] = 1;
 
       reg_map.stage[ p->pipe_latch[ID_LATCH][ii].tr_entry.dest ] = ID_LATCH;
       reg_map.pipe[ p->pipe_latch[ID_LATCH][ii].tr_entry.dest ] = ii;
     }
-
-    //printf("%d %d\n", ENABLE_EXE_FWD, ENABLE_MEM_FWD);
-
 
   }
 }
@@ -369,73 +301,11 @@ void pipe_cycle_FE(Pipeline *p){
   Pipeline_Latch fetch_op;
   bool tr_read_success;
 
-  Pipeline_Latch id;
-
   for(ii=0; ii<PIPE_WIDTH; ii++){
-
-    // we should only pull an instruction if previous one was flopped forward
-    // maybe we do need a better way to do this
-    // not sure if valid NEEDs to be used for something else.
-
-    //printf("valid = %d\n", p->pipe_latch[FE_LATCH][ii].valid);
 
     if (!p->pipe_latch[FE_LATCH][ii].valid) {
       
-      id = p->pipe_latch[FE_LATCH][ii];
-
-      pipe_get_fetch_op(p, &fetch_op);
-
-/*
-      if (id.tr_entry.dest_needed && 
-          id.tr_entry.dest == fetch_op.tr_entry.src1_reg &&
-          fetch_op.tr_entry.src1_needed &&
-          id.tr_entry.mem_read){
-            //printf("it happened!!!\n");
-          stalls++;
-          printf("%d\n", stalls);
-      }
-      else if (id.tr_entry.dest_needed && 
-          id.tr_entry.dest == fetch_op.tr_entry.src2_reg &&
-          fetch_op.tr_entry.src2_needed &&
-          id.tr_entry.mem_read){
-            //printf("it happened!!!\n");
-          stalls++;
-          printf("%d\n", stalls);
-      }
-*/
-
-/*
-      if (id.tr_entry.dest_needed && 
-          id.tr_entry.dest == fetch_op.tr_entry.src1_reg &&
-          fetch_op.tr_entry.src1_needed){
-            //printf("it happened!!!\n");
-          stalls+=2;
-          printf("%d\n", stalls);
-      }
-      else if (id.tr_entry.dest_needed && 
-          id.tr_entry.dest == fetch_op.tr_entry.src2_reg &&
-          fetch_op.tr_entry.src2_needed){
-            //printf("it happened!!!\n");
-          stalls+=2;
-          printf("%d\n", stalls);
-      }
-*/
-
-
-/*
-      if (id.tr_entry.mem_read)
-      {
-            printf("src %d needed %d src %d needed %d dest %d needed %d type %d \n", 
-            fetch_op.tr_entry.src1_reg,
-            fetch_op.tr_entry.src1_needed,
-            fetch_op.tr_entry.src2_reg,
-            fetch_op.tr_entry.src2_needed,
-            id.tr_entry.dest,
-            id.tr_entry.dest_needed,
-            fetch_op.tr_entry.op_type
-            );
-      }
-*/    
+      pipe_get_fetch_op(p, &fetch_op); 
 
       if(BPRED_POLICY){
         pipe_check_bpred(p, &fetch_op);
