@@ -244,6 +244,12 @@ void pipe_cycle_ID(Pipeline *p){
     src1_hazard = reg_map.inflight[src1] && src1_needed;
     src2_hazard = reg_map.inflight[src2] && src2_needed;
 
+    bool forward_ex_src1 = false;
+    bool forward_ex_src2 = false;
+    bool forward_mem_src1 = false;
+    bool forward_mem_src2 = false;
+
+    // can definitely run into a problem if a load is in ex, and a value that shud not be forwarded is in mem.
     if(ENABLE_EXE_FWD){
       if (src1_hazard) {
         Latch_Type stage = reg_map.stage[src1];
@@ -271,16 +277,20 @@ void pipe_cycle_ID(Pipeline *p){
       }
 
       if (src2_hazard) {
-
         Latch_Type stage = reg_map.stage[src2];
         bool forward_mem = stage == MEM_LATCH;
 
         if (forward_mem) src2_hazard = false;             
-
       }
     }
 
-    p->pipe_latch[ID_LATCH][ii].stall = src1_hazard || src2_hazard;
+    if (ii==0) {
+      p->pipe_latch[ID_LATCH][ii].stall = src1_hazard || src2_hazard;
+    } 
+    else {
+      p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || src1_hazard || src2_hazard;
+    }
+
 
     if (p->pipe_latch[ID_LATCH][ii].tr_entry.dest_needed &&
         !p->pipe_latch[ID_LATCH][ii].stall) {
