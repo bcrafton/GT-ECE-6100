@@ -134,6 +134,18 @@ bool hazard(int pipe)
         ex[i].tr_entry.mem_read) {
           return true; //p->stat_num_cycle+=1;
     }
+    else if(i < pipe &&
+        id[i].tr_entry.dest_needed && 
+        id[i].tr_entry.dest == id[pipe].tr_entry.src1_reg &&
+        id[pipe].tr_entry.src1_needed) {
+          return true;
+    }
+    else if(i < pipe &&
+        id[i].tr_entry.dest_needed && 
+        id[i].tr_entry.dest == id[pipe].tr_entry.src2_reg &&
+        id[pipe].tr_entry.src2_needed) {
+          return true;
+    }
     else {
       return false;  
     }
