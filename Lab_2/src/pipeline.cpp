@@ -116,23 +116,30 @@ Pipeline_Latch zero_pipe;
 
 bool stalls[8];
 
-bool hazard(int pipe_entry)
+bool hazard(int pipe)
 {
-  if (ex[0].tr_entry.dest_needed && 
-      ex[0].tr_entry.dest == id[0].tr_entry.src1_reg &&
-      id[0].tr_entry.src1_needed &&
-      ex[0].tr_entry.mem_read) {
-        return true; //p->stat_num_cycle+=1;
+
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++) {
+
+    if (ex[i].tr_entry.dest_needed && 
+        ex[i].tr_entry.dest == id[pipe].tr_entry.src1_reg &&
+        id[pipe].tr_entry.src1_needed &&
+        ex[i].tr_entry.mem_read) {
+          return true; //p->stat_num_cycle+=1;
+    }
+    else if (ex[i].tr_entry.dest_needed && 
+        ex[i].tr_entry.dest == id[pipe].tr_entry.src2_reg &&
+        id[pipe].tr_entry.src2_needed &&
+        ex[i].tr_entry.mem_read) {
+          return true; //p->stat_num_cycle+=1;
+    }
+    else {
+      return false;  
+    }
+
   }
-  else if (ex[0].tr_entry.dest_needed && 
-      ex[0].tr_entry.dest == id[0].tr_entry.src2_reg &&
-      id[0].tr_entry.src2_needed &&
-      ex[0].tr_entry.mem_read) {
-        return true; //p->stat_num_cycle+=1;
-  }
-  else {
-    return false;  
-  }
+
 }
 
 void set_false()
