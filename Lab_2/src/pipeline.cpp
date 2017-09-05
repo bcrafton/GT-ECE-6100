@@ -109,6 +109,112 @@ void pipe_print_state(Pipeline *p){
  * Pipeline Main Function: Every cycle, cycle the stage 
  **********************************************************************/
 
+Pipeline_Latch mem[8];
+Pipeline_Latch ex[8];
+Pipeline_Latch id[8];
+Pipeline_Latch zero_pipe;
+
+bool stalls[8];
+
+bool hazard(int pipe_entry)
+{
+  if (ex[0].tr_entry.dest_needed && 
+      ex[0].tr_entry.dest == id[0].tr_entry.src1_reg &&
+      id[0].tr_entry.src1_needed &&
+      ex[0].tr_entry.mem_read) {
+        return true; //p->stat_num_cycle+=1;
+  }
+  else if (ex[0].tr_entry.dest_needed && 
+      ex[0].tr_entry.dest == id[0].tr_entry.src2_reg &&
+      id[0].tr_entry.src2_needed &&
+      ex[0].tr_entry.mem_read) {
+        return true; //p->stat_num_cycle+=1;
+  }
+  else {
+    return false;  
+  }
+}
+
+void set_false()
+{
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++)
+  {
+    stalls[i] = false;
+  }
+}
+
+void pipe_cycle(Pipeline *p)
+{
+
+  bool stall = false;
+  set_false();
+
+  p->stat_num_cycle++;
+
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++)
+  {
+    if(id[i].op_id >= p->halt_op_id){
+      p->halt=true;
+    }
+
+    mem[i] = ex[i]; // set mem
+    ex[i] = id[i]; // set ex
+
+    // these are only done in first loop
+    pipe_get_fetch_op(p, &id[i]); // set id
+    p->stat_retired_inst++;
+  }
+
+  for(i=0; i<PIPE_WIDTH; i++)
+  {
+    if (i == 0) {
+      stalls[i] = hazard(i);
+    }
+    else{
+      stalls[i] = stalls[i-1] || hazard(i);
+    }
+
+    stall = stall || stalls[i];
+  }
+
+  while(stall){
+
+    stall = false;
+
+    p->stat_num_cycle++;
+
+    for(i=0; i<PIPE_WIDTH; i++)
+    {
+      mem[i] = ex[i]; // set mem
+      if(!stalls[i]) {
+        ex[i] = id[i]; // set ex
+        id[i] = zero_pipe;
+      }
+      else {
+        ex[i] = zero_pipe;      
+      }
+    }
+
+    set_false();
+
+    for(i=0; i<PIPE_WIDTH; i++)
+    {
+      if (i == 0) {
+        stalls[i] = hazard(i);
+      }
+      else{
+        stalls[i] = stalls[i-1] || hazard(i);
+      }
+
+      stall = stall || stalls[i];
+    }
+  }
+}
+
+/*
+
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
@@ -120,6 +226,9 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_FE(p);
 	    
 }
+
+*/
+
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
