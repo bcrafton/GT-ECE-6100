@@ -109,6 +109,34 @@ void pipe_print_state(Pipeline *p){
  * Pipeline Main Function: Every cycle, cycle the stage 
  **********************************************************************/
 
+void print_instruction(Pipeline_Latch* i)
+{
+  if (i->valid) {
+    printf("%d | %d %d | %d %d | %d %d | %d | %lx %d %d\n",
+
+    i->op_id,
+
+    i->tr_entry.src1_reg,
+    i->tr_entry.src1_needed,
+
+    i->tr_entry.src2_reg,
+    i->tr_entry.src2_needed,
+
+    i->tr_entry.dest,
+    i->tr_entry.dest_needed,
+
+    i->tr_entry.op_type,
+
+    i->tr_entry.mem_addr,
+    i->tr_entry.mem_write,
+    i->tr_entry.mem_read
+
+    );
+  }
+}
+
+/*
+
 Pipeline_Latch mem[8];
 Pipeline_Latch ex[8];
 Pipeline_Latch id[8];
@@ -154,6 +182,8 @@ bool hazard(int pipe)
 
 }
 
+
+
 void set_false()
 {
   int i;
@@ -162,6 +192,7 @@ void set_false()
     stalls[i] = false;
   }
 }
+
 
 void pipe_cycle(Pipeline *p)
 {
@@ -183,6 +214,7 @@ void pipe_cycle(Pipeline *p)
 
     // these are only done in first loop
     pipe_get_fetch_op(p, &id[i]); // set id
+    print_instruction(&id[i]);
     p->stat_retired_inst++;
   }
 
@@ -231,6 +263,7 @@ void pipe_cycle(Pipeline *p)
     }
   }
 }
+*/
 
 /*
 
@@ -247,6 +280,40 @@ void pipe_cycle(Pipeline *p)
 }
 
 */
+
+uint64_t stat_optype_dyn[NUM_OP_TYPE] = { 0 };
+
+void pipe_cycle(Pipeline *p)
+{
+    Pipeline_Latch fetch_op;
+    pipe_get_fetch_op(p, &fetch_op); // set id
+
+    p->stat_num_cycle++;
+
+    if (fetch_op.valid) {
+      print_instruction(&fetch_op);
+    } else {
+      printf("garbage!\n");
+    }
+
+    // count regardless if valid
+    p->stat_retired_inst++;
+
+    if (fetch_op.valid) {
+      stat_optype_dyn[fetch_op.tr_entry.op_type]++;
+    }    
+
+    if(fetch_op.op_id >= p->halt_op_id){
+      p->halt=true;
+    }   
+
+    int i;
+    if (p->halt) {
+      for(i=0; i<NUM_OP_TYPE; i++) {
+        printf("%d : %lu\n", i, stat_optype_dyn[i]);
+      }
+    }
+}
 
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
