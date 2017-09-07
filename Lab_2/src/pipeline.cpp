@@ -112,7 +112,7 @@ void pipe_print_state(Pipeline *p){
 void print_instruction(Pipeline_Latch* i)
 {
   if (i->valid) {
-    printf("%d | %d %d | %d %d | %d %d | %d | %lx %d %d\n",
+    printf("%d | %d %d | %d %d | %d %d | %lx %d %d | %d | %d\n",
 
     i->op_id,
 
@@ -125,11 +125,13 @@ void print_instruction(Pipeline_Latch* i)
     i->tr_entry.dest,
     i->tr_entry.dest_needed,
 
-    i->tr_entry.op_type,
-
     i->tr_entry.mem_addr,
     i->tr_entry.mem_write,
-    i->tr_entry.mem_read
+    i->tr_entry.mem_read,
+
+    i->tr_entry.op_type,
+
+    i->valid
 
     );
   }
@@ -290,11 +292,15 @@ void pipe_cycle(Pipeline *p)
 
     p->stat_num_cycle++;
 
+/*
     if (fetch_op.valid) {
       print_instruction(&fetch_op);
     } else {
       printf("garbage!\n");
     }
+*/
+
+    print_instruction(&fetch_op);
 
     // count regardless if valid
     p->stat_retired_inst++;
