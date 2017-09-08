@@ -112,7 +112,7 @@ void pipe_print_state(Pipeline *p){
 void print_instruction(Pipeline_Latch* i)
 {
   if (i->valid) {
-    printf("%d | %d %d | %d %d | %d %d | %lx %d %d | %d | %d\n",
+    printf("%lu | %d %d | %d %d | %d %d | %lx %d %d | %d | %d\n",
 
     i->op_id,
 
@@ -281,7 +281,7 @@ void pipe_cycle(Pipeline *p)
 	    
 }
 
-*/
+
 
 uint64_t stat_optype_dyn[NUM_OP_TYPE] = { 0 };
 
@@ -291,14 +291,6 @@ void pipe_cycle(Pipeline *p)
     pipe_get_fetch_op(p, &fetch_op); // set id
 
     p->stat_num_cycle++;
-
-/*
-    if (fetch_op.valid) {
-      print_instruction(&fetch_op);
-    } else {
-      printf("garbage!\n");
-    }
-*/
 
     print_instruction(&fetch_op);
 
@@ -321,6 +313,20 @@ void pipe_cycle(Pipeline *p)
     }
 }
 
+*/
+
+void pipe_cycle(Pipeline *p)
+{
+    p->stat_num_cycle++;
+
+    pipe_cycle_WB(p);
+    pipe_cycle_MEM(p);
+    pipe_cycle_EX(p);
+    pipe_cycle_ID(p);
+    pipe_cycle_FE(p);
+	    
+}
+
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
@@ -332,7 +338,14 @@ typedef struct register_map{
   uint8_t pipe[32];
 } register_map_t;
 
+typedef struct cc_map{
+  uint8_t inflight;
+  Latch_Type stage;
+  uint8_t pipe;
+} cc_map_t;
+
 static register_map_t reg_map;
+static cc_map_t cc_map;
 
 void update_regmap()
 {
@@ -359,6 +372,32 @@ void update_regmap()
             fprintf(stderr, "Error: Should not get anything besides EX/MEM here. Got: %d\n", reg_map.stage[i]);
             assert(0);
       }
+    }
+  }
+}
+
+void update_ccmap()
+{
+  if (cc_map.inflight)
+  {
+      switch (cc_map.stage) {
+      
+        case FE_LATCH:
+          // do nothing
+          break;
+        case ID_LATCH:
+          cc_map.stage = EX_LATCH;
+          break;
+        case EX_LATCH:
+          cc_map.stage = MEM_LATCH;
+          break;
+        case MEM_LATCH:
+          cc_map.stage = FE_LATCH;
+          cc_map.inflight = 0;
+          break;
+        default:
+          fprintf(stderr, "Error: Should not get anything besides EX/MEM here. Got: %d\n", cc_map.stage);
+          assert(0);
     }
   }
 }
@@ -420,6 +459,7 @@ void pipe_cycle_ID(Pipeline *p){
 
   bool src1_hazard;
   bool src2_hazard;
+  bool cc_hazard;
 
   uint8_t src1;
   uint8_t src1_needed;
@@ -427,7 +467,10 @@ void pipe_cycle_ID(Pipeline *p){
   uint8_t src2;
   uint8_t src2_needed;
 
+  uint8_t cc_read;
+
   update_regmap();
+  update_ccmap();
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
         
@@ -442,13 +485,12 @@ void pipe_cycle_ID(Pipeline *p){
     src2 = p->pipe_latch[ID_LATCH][ii].tr_entry.src2_reg;
     src2_needed = p->pipe_latch[ID_LATCH][ii].tr_entry.src2_needed;
 
+    cc_read = p->pipe_latch[ID_LATCH][ii].tr_entry.cc_read;
+
+    // need to say if cc_read is enabled or not.
     src1_hazard = reg_map.inflight[src1] && src1_needed;
     src2_hazard = reg_map.inflight[src2] && src2_needed;
-
-    bool forward_ex_src1 = false;
-    bool forward_ex_src2 = false;
-    bool forward_mem_src1 = false;
-    bool forward_mem_src2 = false;
+    cc_hazard = cc_map.inflight && cc_read;
 
     // can definitely run into a problem if a load is in ex, and a value that shud not be forwarded is in mem.
     if(ENABLE_EXE_FWD){
@@ -486,10 +528,10 @@ void pipe_cycle_ID(Pipeline *p){
     }
 
     if (ii==0) {
-      p->pipe_latch[ID_LATCH][ii].stall = src1_hazard || src2_hazard;
-    } 
+      p->pipe_latch[ID_LATCH][ii].stall = src1_hazard || src2_hazard || cc_hazard;
+    }  
     else {
-      p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || src1_hazard || src2_hazard;
+      p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || src1_hazard || src2_hazard || cc_hazard;
     }
 
 
@@ -502,6 +544,14 @@ void pipe_cycle_ID(Pipeline *p){
       reg_map.pipe[ p->pipe_latch[ID_LATCH][ii].tr_entry.dest ] = ii;
     }
 
+    if (p->pipe_latch[ID_LATCH][ii].tr_entry.cc_write &&
+        !p->pipe_latch[ID_LATCH][ii].stall) {
+
+      cc_map.inflight = 1;
+      cc_map.stage = ID_LATCH;
+      cc_map.pipe = ii;
+
+    }
   }
 }
 
