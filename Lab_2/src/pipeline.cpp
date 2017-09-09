@@ -360,7 +360,7 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 
   uint8_t valid1 =      p->pipe_latch[ID_LATCH][pipe].valid;
   uint8_t mem_read1 =   p->pipe_latch[ID_LATCH][pipe].tr_entry.mem_read;
-  uint8_t mem_addr1 =   p->pipe_latch[ID_LATCH][pipe].tr_entry.mem_addr;
+  uint64_t mem_addr1 =  p->pipe_latch[ID_LATCH][pipe].tr_entry.mem_addr;
 
   // older
 
@@ -370,29 +370,31 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
   
   uint8_t valid2 =      p->pipe_latch[stage2][pipe2].valid;
   uint8_t mem_read2 =   p->pipe_latch[stage2][pipe2].tr_entry.mem_read;
-  uint8_t mem_addr2 =   p->pipe_latch[stage2][pipe2].tr_entry.mem_addr;
+  uint64_t mem_addr2 =  p->pipe_latch[stage2][pipe2].tr_entry.mem_addr;
   uint8_t mem_write2 =  p->pipe_latch[stage2][pipe2].tr_entry.mem_write;
 
   // check
 
   if (!valid1 || !valid2) {
-    return false;  
+    return false;
   }
 
-  if (src1_needed && dest_needed && src1 == dest) {
-    if(ENABLE_EXE_FWD && stage2 == EX_LATCH && !mem_read2){
+  if (src1_needed && dest_needed && (src1 == dest)) {
+    return true;
+    if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
     }
-    else if(ENABLE_MEM_FWD && stage2 == MEM_LATCH) {
+    else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
       return true;
     }
   }
 
-  if (src2_needed && dest_needed && src2 == dest) {
-    if(ENABLE_EXE_FWD && stage2 == EX_LATCH && !mem_read2){
+  if (src2_needed && dest_needed && (src2 == dest)) {
+    return true;
+    if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
     }
-    else if(ENABLE_MEM_FWD && stage2 == MEM_LATCH) {
+    else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
       return true;
@@ -400,9 +402,10 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
   }
 
   if (cc_read && cc_write) {
-    if(ENABLE_EXE_FWD && stage2 == EX_LATCH){
+    return true;
+    if(ENABLE_EXE_FWD && (stage2 == EX_LATCH)){
     }
-    else if(ENABLE_MEM_FWD && stage2 == MEM_LATCH) {
+    else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
       return true;
@@ -410,7 +413,8 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
   }
 
   if (mem_read1 && mem_write2 && (mem_addr1 == mem_addr2)){
-    if(ENABLE_MEM_FWD && stage2 == MEM_LATCH) {
+    return true;
+    if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else{
       return true;
@@ -499,6 +503,16 @@ void update_ccmap()
   }
 }
 
+bool pipeline_stalled(Pipeline *p)
+{
+  bool stall = false;
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++){
+    stall = stall || p->pipe_latch[ID_LATCH][i].stall;
+  }
+  return stall;
+}
+
 void pipe_cycle_WB(Pipeline *p){
   int ii;  
 
@@ -536,11 +550,12 @@ void pipe_cycle_EX(Pipeline *p){
 
     // if the prev stage is stalled, whatever here is invalid.
     if(p->pipe_latch[ID_LATCH][ii].stall) {
-      p->pipe_latch[EX_LATCH][ii].valid = false;
+      p->pipe_latch[EX_LATCH][ii].valid = 0;
     }
 
     else {
       p->pipe_latch[EX_LATCH][ii]=p->pipe_latch[ID_LATCH][ii];
+      p->pipe_latch[ID_LATCH][ii].valid = 0;
     }
   }
 }
@@ -554,7 +569,7 @@ void pipe_cycle_ID(Pipeline *p){
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
         
-    if(!p->pipe_latch[ID_LATCH][ii].stall) {
+    if(!pipeline_stalled(p)) {
       p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
       p->pipe_latch[FE_LATCH][ii].valid = 0;
     }
