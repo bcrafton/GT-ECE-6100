@@ -509,6 +509,15 @@ void pipe_cycle_ID(Pipeline *p){
 
         if (forward_ex) src2_hazard = false;                
       }
+
+      if (cc_hazard) {
+        Latch_Type stage = cc_map.stage;
+        uint8_t pipe = cc_map.pipe;
+        bool forward_ex = stage == EX_LATCH; 
+
+        if (forward_ex) cc_hazard = false;
+
+      }
     }
 
     if(ENABLE_MEM_FWD){
@@ -523,7 +532,16 @@ void pipe_cycle_ID(Pipeline *p){
         Latch_Type stage = reg_map.stage[src2];
         bool forward_mem = stage == MEM_LATCH;
 
-        if (forward_mem) src2_hazard = false;             
+        if (forward_mem) src2_hazard = false;
+      }
+
+      if (cc_hazard) {
+        Latch_Type stage = cc_map.stage;
+        uint8_t pipe = cc_map.pipe;
+        bool forward_mem = stage == MEM_LATCH; 
+
+        if (forward_mem) cc_hazard = false;
+
       }
     }
 
