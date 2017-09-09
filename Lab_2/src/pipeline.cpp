@@ -347,6 +347,62 @@ typedef struct cc_map{
 static register_map_t reg_map;
 static cc_map_t cc_map;
 
+bool check_depends(Pipeline *p, uint8_t pipe, Latch_Type stage)
+{
+  uint8_t src1 = p->pipe_latch[ID_LATCH][pipe].tr_entry.src1_reg;
+  uint8_t src1_needed = p->pipe_latch[ID_LATCH][pipe].tr_entry.src1_needed;
+
+  uint8_t src2 = p->pipe_latch[stage][pipe].tr_entry.src2_reg;
+  uint8_t src2_needed = p->pipe_latch[stage][pipe].tr_entry.src2_needed;
+
+  uint8_t cc_read = p->pipe_latch[stage][pipe].tr_entry.cc_read;
+
+  uint8_t dest;
+  uint8_t dest_needed;
+  uint8_t cc_write;
+
+  int i;
+  for(i=0; i<pipe; i++) {
+
+    dest = p->pipe_latch[ID_LATCH][i].tr_entry.dest;
+    dest_needed = p->pipe_latch[ID_LATCH][i].tr_entry.dest_needed;
+    cc_write = p->pipe_latch[ID_LATCH][i].tr_entry.cc_write;
+
+    if ( (src1_needed && dest_needed && src1 == dest) || 
+         (src2_needed && dest_needed && src1 == dest) || 
+         (cc_read && cc_write) ) {
+      return true;
+    }
+  }
+
+  for(i=0; i<PIPE_WIDTH; i++) {
+
+    dest = p->pipe_latch[EX_LATCH][i].tr_entry.dest;
+    dest_needed = p->pipe_latch[EX_LATCH][i].tr_entry.dest_needed;
+    cc_write = p->pipe_latch[EX_LATCH][i].tr_entry.cc_write;
+
+    if ( (src1_needed && dest_needed && src1 == dest) || 
+         (src2_needed && dest_needed && src1 == dest) || 
+         (cc_read && cc_write) ) {
+      return true;
+    }
+  }
+
+  for(i=0; i<PIPE_WIDTH; i++) {
+
+    dest = p->pipe_latch[MEM_LATCH][i].tr_entry.dest;
+    dest_needed = p->pipe_latch[MEM_LATCH][i].tr_entry.dest_needed;
+    cc_write = p->pipe_latch[MEM_LATCH][i].tr_entry.cc_write;
+
+    if ( (src1_needed && dest_needed && src1 == dest) || 
+         (src2_needed && dest_needed && src1 == dest) || 
+         (cc_read && cc_write) ) {
+      return true;
+    }
+  }
+
+}
+
 void update_regmap()
 {
   int i;
@@ -509,6 +565,15 @@ void pipe_cycle_ID(Pipeline *p){
 
         if (forward_ex) src2_hazard = false;                
       }
+
+      if (cc_hazard) {
+        Latch_Type stage = cc_map.stage;
+        uint8_t pipe = cc_map.pipe;
+        bool forward_ex = stage == EX_LATCH; 
+
+        if (forward_ex) cc_hazard = false;
+
+      }
     }
 
     if(ENABLE_MEM_FWD){
@@ -523,7 +588,16 @@ void pipe_cycle_ID(Pipeline *p){
         Latch_Type stage = reg_map.stage[src2];
         bool forward_mem = stage == MEM_LATCH;
 
-        if (forward_mem) src2_hazard = false;             
+        if (forward_mem) src2_hazard = false;
+      }
+
+      if (cc_hazard) {
+        Latch_Type stage = cc_map.stage;
+        uint8_t pipe = cc_map.pipe;
+        bool forward_mem = stage == MEM_LATCH; 
+
+        if (forward_mem) cc_hazard = false;
+
       }
     }
 
