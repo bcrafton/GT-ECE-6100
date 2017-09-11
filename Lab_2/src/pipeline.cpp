@@ -499,14 +499,33 @@ void update_ccmap()
   }
 }
 
-bool pipeline_stalled(Pipeline *p)
+bool pipeline_stalled(Pipeline *p, uint8_t pipe)
 {
   bool stall = false;
   int i;
-  for(i=0; i<PIPE_WIDTH; i++){
+  for(i=pipe; i<PIPE_WIDTH; i++){
     stall = stall || p->pipe_latch[ID_LATCH][i].stall;
   }
   return stall;
+}
+
+void check_opid(Pipeline_Latch* l)
+{
+  static uint64_t op_id = 1;
+  static uint64_t fuckups = 0;
+  if (l->valid)
+  {
+    if (op_id == l->op_id)
+    {
+      op_id++;
+    }
+    else
+    {
+      printf("wrong op id: %lu %lu %lu\n", op_id, l->op_id, fuckups);
+      fuckups++;
+      op_id = l->op_id+1;
+    }
+  }
 }
 
 void pipe_cycle_WB(Pipeline *p){
@@ -515,6 +534,8 @@ void pipe_cycle_WB(Pipeline *p){
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
     if(p->pipe_latch[MEM_LATCH][ii].valid){
+
+      check_opid(&p->pipe_latch[MEM_LATCH][ii]);
 
       p->stat_retired_inst++;
       //printf("retired instructions: %lu\n", p->stat_retired_inst);
@@ -535,6 +556,10 @@ void pipe_cycle_MEM(Pipeline *p){
 
     p->pipe_latch[MEM_LATCH][ii]=p->pipe_latch[EX_LATCH][ii];
 
+    if (p->fetch_cbr_stall && p->pipe_latch[MEM_LATCH][ii].is_mispred_cbr) {
+      p->fetch_cbr_stall = false;
+    }
+
   }
 }
 
@@ -553,10 +578,6 @@ void pipe_cycle_EX(Pipeline *p){
     else {
       p->pipe_latch[EX_LATCH][ii]=p->pipe_latch[ID_LATCH][ii];
       p->pipe_latch[ID_LATCH][ii].valid = 0;
-
-      if (p->fetch_cbr_stall && p->pipe_latch[EX_LATCH][ii].is_mispred_cbr) {
-        p->fetch_cbr_stall = false;
-      }
     }
   }
 }
@@ -569,7 +590,7 @@ void pipe_cycle_ID(Pipeline *p){
   int j;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-    if(!pipeline_stalled(p)) {
+    if(!pipeline_stalled(p, ii)) {
       p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
       p->pipe_latch[FE_LATCH][ii].valid = 0;
     }
