@@ -540,17 +540,13 @@ void pipe_cycle_MEM(Pipeline *p){
 
 //--------------------------------------------------------------------//
 
-static bool flush;
-
 void pipe_cycle_EX(Pipeline *p){
-
-  flush = false;
 
   int ii;
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
     // if the prev stage is stalled, whatever here is invalid.
-    if(p->pipe_latch[ID_LATCH][ii].stall || flush) {
+    if(p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[EX_LATCH][ii].valid = 0;
     }
 
@@ -559,11 +555,7 @@ void pipe_cycle_EX(Pipeline *p){
       p->pipe_latch[ID_LATCH][ii].valid = 0;
 
       if (p->fetch_cbr_stall && p->pipe_latch[EX_LATCH][ii].is_mispred_cbr) {
-        flush = true;
         p->fetch_cbr_stall = false;
-      }
-      else {
-        flush = false;
       }
     }
   }
@@ -577,22 +569,15 @@ void pipe_cycle_ID(Pipeline *p){
   int j;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-
-    if(flush) {
-      p->pipe_latch[ID_LATCH][ii].valid = 0;
-      p->pipe_latch[ID_LATCH][ii].stall = 0;
+    if(!pipeline_stalled(p)) {
+      p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
+      p->pipe_latch[FE_LATCH][ii].valid = 0;
     }
+    if (ii==0) {
+      p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
+    }  
     else {
-      if(!pipeline_stalled(p)) {
-        p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
-        p->pipe_latch[FE_LATCH][ii].valid = 0;
-      }
-      if (ii==0) {
-        p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
-      }  
-      else {
-        p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || check_hazards(p, ii);
-      }
+      p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || check_hazards(p, ii);
     }
   }
 }
@@ -605,11 +590,7 @@ void pipe_cycle_FE(Pipeline *p) {
   bool tr_read_success;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-
-    if(flush) {
-      p->pipe_latch[FE_LATCH][ii].valid = 0;
-    }
-    else if (!p->pipe_latch[FE_LATCH][ii].valid) {
+    if (!p->pipe_latch[FE_LATCH][ii].valid && !p->fetch_cbr_stall) {
       
       pipe_get_fetch_op(p, &fetch_op); 
 
@@ -634,10 +615,16 @@ void pipe_check_bpred(Pipeline *p, Pipeline_Latch *fetch_op) {
   // if (BPRED_ALWAYS_TAKEN)
 
   // if our prediction was wrong
-  if (fetch_op->tr_entry.op_type == OP_CBR && !fetch_op->tr_entry.br_dir)
+  if (fetch_op->tr_entry.op_type == OP_CBR)
   {
-    fetch_op->is_mispred_cbr = true;
-    p->fetch_cbr_stall = true;
+    p->b_pred->stat_num_branches++;
+    if(!fetch_op->tr_entry.br_dir)
+    {
+      p->b_pred->stat_num_mispred++;      
+
+      fetch_op->is_mispred_cbr = true;
+      p->fetch_cbr_stall = true;
+    }
   }
 }
 
