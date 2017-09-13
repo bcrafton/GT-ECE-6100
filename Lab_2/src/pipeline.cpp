@@ -67,7 +67,7 @@ Pipeline * pipe_init(FILE *tr_file_in){
 
 void pipe_print_state(Pipeline *p){
     std::cout << "--------------------------------------------" << std::endl;
-    std::cout <<"cycle count : " << p->stat_num_cycle << " retired_instruction : " << p->stat_retired_inst << std::endl;
+    std::cout <<"cycle count : " << p->stat_num_cycle << " retired_instruction : " << p->stat_retired_inst << " retired inst number : " << p->stat_retired_inst << std::endl;
 
     uint8_t latch_type_i = 0;   // Iterates over Latch Types
     uint8_t width_i      = 0;   // Iterates over Pipeline Width
@@ -145,6 +145,7 @@ void print_instruction(Pipeline_Latch* i)
 
 void pipe_cycle(Pipeline *p)
 {
+
     p->stat_num_cycle++;
 
     pipe_cycle_WB(p);
@@ -152,6 +153,19 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_EX(p);
     pipe_cycle_ID(p);
     pipe_cycle_FE(p);
+
+/*
+    print_instruction(&p->pipe_latch[MEM_LATCH][0]);
+    print_instruction(&p->pipe_latch[MEM_LATCH][1]);
+    print_instruction(&p->pipe_latch[EX_LATCH][0]);
+    print_instruction(&p->pipe_latch[EX_LATCH][1]);
+    print_instruction(&p->pipe_latch[ID_LATCH][0]);
+    print_instruction(&p->pipe_latch[ID_LATCH][1]);
+
+    pipe_print_state(p);
+*/
+
+
 	    
 }
 
@@ -234,8 +248,9 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
     return NO_DEPEND;
   }
 
-  if (op_id1+1 < op_id2)
+  if ( ((op_id1+1 < op_id2) || (op_id2+1 < op_id1)) && (stage2 == ID_LATCH) )
   {
+    fprintf(stderr, "id1 id2: %lu %lu\n", op_id1, op_id2);
     assert(0);
   }
 
@@ -247,7 +262,7 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
       return FORWARD;
     }
     else {
-      //printf("src1\n");
+      printf("stall src1 opid = %lu %lu\n", op_id1, op_id2);
       return DEPEND;
     }
   }
@@ -260,7 +275,7 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
       return FORWARD;
     }
     else {
-      //printf("src2\n");
+      printf("stall src2 opid = %lu %lu\n", op_id1, op_id2);
       return DEPEND;
     }
   }
@@ -273,7 +288,7 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
       return FORWARD;
     }
     else {
-      //printf("cc\n");
+      printf("stall cc opid = %lu %lu\n", op_id1, op_id2);
       return DEPEND;
     }
   }
@@ -283,7 +298,7 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
       return FORWARD;
     }
     else{
-      //printf("memory\n");
+      printf("stall mem opid = %lu %lu\n", op_id1, op_id2);
       return DEPEND;
     }
   }
@@ -456,7 +471,7 @@ void pipe_cycle_FE(Pipeline *p) {
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
-    if (!p->pipe_latch[FE_LATCH][ii].valid && !p->fetch_cbr_stall) {
+    if (!p->pipe_latch[FE_LATCH][r_order(p, ii, ID_LATCH)].valid && !p->fetch_cbr_stall) {
       
       pipe_get_fetch_op(p, &fetch_op); 
 
@@ -465,7 +480,7 @@ void pipe_cycle_FE(Pipeline *p) {
       }
       
       // copy the op in FE LATCH
-      p->pipe_latch[FE_LATCH][ii]=fetch_op;
+      p->pipe_latch[FE_LATCH][r_order(p, ii, ID_LATCH)]=fetch_op;
     }
   }
 }
