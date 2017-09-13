@@ -111,8 +111,8 @@ void pipe_print_state(Pipeline *p){
 
 void print_instruction(Pipeline_Latch* i)
 {
-  if (i->valid) {
-    printf("%lu | %d %d | %d %d | %d %d | %lx %d %d | %d | %d\n",
+  if (1) {
+    printf("%lu | %d %d | %d %d | %d %d | %lx %d %d | %d | %d %d %d %d | %d %d\n",
 
     i->op_id,
 
@@ -131,6 +131,12 @@ void print_instruction(Pipeline_Latch* i)
 
     i->tr_entry.op_type,
 
+    i->tr_entry.cc_read,
+    i->tr_entry.cc_write,
+    i->tr_entry.br_dir,
+    i->is_mispred_cbr,
+
+    i->stall,
     i->valid
 
     );
@@ -153,12 +159,18 @@ void pipe_cycle(Pipeline *p)
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
 
+typedef enum hazard {
+    NO_DEPEND,
+    DEPEND,
+    FORWARD
+} hazard_t; 
+
 uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type latch)
 {
   uint8_t order = 0;
   
   if (!p->pipe_latch[latch][pipe].valid) {
-    return 0;
+    return PIPE_WIDTH-1;
   }
 
   int i;
@@ -179,9 +191,10 @@ uint8_t r_order(Pipeline *p, uint8_t index, Latch_Type latch)
       return i;
     }
   }
+  return 0;
 }
 
-bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
+hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 {
 
   // younger
@@ -213,12 +226,12 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
   // check
 
   if (!valid1 || !valid2) {
-    return false;
+    return NO_DEPEND;
   }
 
   if (op_id1 <= op_id2)
   {
-    return false;
+    return NO_DEPEND;
   }
 
   if (op_id1+1 < op_id2)
@@ -228,68 +241,111 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 
   if (src1_needed && dest_needed && (src1 == dest)) {
     if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
+      return FORWARD;
     }
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
+      return FORWARD;
     }
     else {
-      return true;
+      //printf("src1\n");
+      return DEPEND;
     }
   }
 
   if (src2_needed && dest_needed && (src2 == dest)) {
     if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
+      return FORWARD;
     }
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
+      return FORWARD;
     }
     else {
-      return true;
+      //printf("src2\n");
+      return DEPEND;
     }
   }
 
   if (cc_read && cc_write) {
     if(ENABLE_EXE_FWD && (stage2 == EX_LATCH)){
+      return FORWARD;
     }
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
+      return FORWARD;
     }
     else {
-      return true;
+      //printf("cc\n");
+      return DEPEND;
     }
   }
 
   if (mem_read1 && mem_write2 && (mem_addr1 == mem_addr2)){
     if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
+      return FORWARD;
     }
     else{
-      return true;
+      //printf("memory\n");
+      return DEPEND;
     }
   }
 
-  return false;
+  return NO_DEPEND;
 
 }
 
 bool check_hazards(Pipeline *p, uint8_t pipe)
 {
   int i;
-  
+  hazard_t hazard;  
+
   for(i=PIPE_WIDTH-1; i>=0; i--) {
-    if (check_hazard(p, pipe, i, ID_LATCH)) {
-      return true;
+    hazard = check_hazard(p, pipe, i, ID_LATCH);
+    if (hazard == NO_DEPEND) {
+    }
+    else if (hazard == DEPEND) {
+      //printf("id\n");
+      return true;    
+    }
+    else {
+      fprintf(stderr, "Invalid hazard type %u\n", hazard);
+      assert(0);    
     }
   }
 
   for(i=PIPE_WIDTH-1; i>=0; i--) {
-    if (check_hazard(p, pipe, i, EX_LATCH)) {
+    hazard = check_hazard(p, pipe, i, EX_LATCH);
+    if (hazard == NO_DEPEND) {
+    }
+    else if (hazard == DEPEND) {
+      //printf("ex\n");
       return true;    
+    }
+    else if (hazard == FORWARD) {
+      return false;    
+    }
+    else {
+      fprintf(stderr, "Invalid hazard type %u\n", hazard);
+      assert(0);    
     }
   }
 
   for(i=PIPE_WIDTH-1; i>=0; i--) {
-    if (check_hazard(p, pipe, i, MEM_LATCH)) {
+    hazard = check_hazard(p, pipe, i, MEM_LATCH);
+    if (hazard == NO_DEPEND) {
+    }
+    else if (hazard == DEPEND) {
+      //printf("mem\n");
       return true;    
     }
+    else if (hazard == FORWARD) {
+      return false;    
+    }
+    else {
+      fprintf(stderr, "Invalid hazard type %u\n", hazard);
+      assert(0);    
+    }
   }
-  return false;
+
+  return NO_DEPEND;
 }
 
 void pipe_cycle_WB(Pipeline *p){
@@ -307,6 +363,14 @@ void pipe_cycle_WB(Pipeline *p){
       if(p->pipe_latch[MEM_LATCH][ii].op_id >= p->halt_op_id){
 	      p->halt=true;
       }
+
+      // no idea where the branch finally resolves ... i guess it is here.
+      if(BPRED_POLICY){
+        if (p->fetch_cbr_stall && p->pipe_latch[MEM_LATCH][ii].is_mispred_cbr) {
+          p->fetch_cbr_stall = false;
+        }
+      }
+
     }
   }
 }
@@ -317,13 +381,17 @@ void pipe_cycle_MEM(Pipeline *p){
   int ii;
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
+    //print_instruction(&p->pipe_latch[EX_LATCH][ii]);
+
     p->pipe_latch[MEM_LATCH][ii]=p->pipe_latch[EX_LATCH][ii];
+    p->pipe_latch[EX_LATCH][ii].valid = 0;
 
     if(BPRED_POLICY){
       if (p->fetch_cbr_stall && p->pipe_latch[MEM_LATCH][ii].is_mispred_cbr) {
-        p->fetch_cbr_stall = false;
+        //p->fetch_cbr_stall = false;
       }
     }
+
   }
 }
 
@@ -332,7 +400,10 @@ void pipe_cycle_MEM(Pipeline *p){
 void pipe_cycle_EX(Pipeline *p){
 
   int ii;
+
   for(ii=0; ii<PIPE_WIDTH; ii++){
+
+    //print_instruction(&p->pipe_latch[ID_LATCH][ii]);
 
     if(p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[EX_LATCH][ii].valid = 0;
@@ -354,6 +425,9 @@ void pipe_cycle_ID(Pipeline *p){
   int j;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
+
+    //print_instruction(&p->pipe_latch[FE_LATCH][ii]);
+
     if(!p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
       p->pipe_latch[FE_LATCH][ii].valid = 0;
@@ -368,7 +442,6 @@ void pipe_cycle_ID(Pipeline *p){
       p->pipe_latch[ID_LATCH][r_order(p, ii, ID_LATCH)].stall = p->pipe_latch[ID_LATCH][r_order(p, ii-1, ID_LATCH)].stall || check_hazards(p, r_order(p, ii, ID_LATCH));
     }
   }
-
 }
 
 //--------------------------------------------------------------------//
