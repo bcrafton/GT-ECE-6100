@@ -315,10 +315,6 @@ void pipe_cycle(Pipeline *p)
 
 */
 
-uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type)
-{
-}
-
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
@@ -334,6 +330,32 @@ void pipe_cycle(Pipeline *p)
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
+
+uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type latch)
+{
+  uint8_t order = 0;
+  
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++) {
+    if (p->pipe_latch[latch][pipe].op_id > p->pipe_latch[latch][i].op_id)
+    {
+      order++;
+    }
+  }
+  return order;
+}
+
+uint8_t r_order(Pipeline *p, uint8_t index, Latch_Type latch)
+{
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++) {
+    if (order(p, i, latch) == index){
+      return i;
+    }
+  }
+  fprintf(stderr, "Invalid index: %d Max index = %d\n", index, PIPE_WIDTH);
+  assert(0);
+}
 
 bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 {
@@ -372,7 +394,7 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 
   if (op_id1+1 < op_id2)
   {
-    assert(0);
+    //assert(0);
   }
 
   if (op_id1 < op_id2)
@@ -450,36 +472,6 @@ bool check_hazards(Pipeline *p, uint8_t pipe)
   return false;
 }
 
-bool pipeline_stalled(Pipeline *p, uint8_t pipe)
-{
-  bool stall = false;
-  int i;
-  for(i=pipe; i<PIPE_WIDTH; i++){
-    stall = stall || p->pipe_latch[ID_LATCH][i].stall;
-  }
-  return stall;
-}
-
-void check_opid(Pipeline_Latch* l)
-{
-  static uint64_t op_id = 1;
-  static uint64_t fuckups = 0;
-  if (l->valid)
-  {
-    if (op_id == l->op_id)
-    {
-      op_id++;
-    }
-    else
-    {
-      assert(0);
-      fprintf(stderr, "wrong op id: %lu %lu %lu\n", op_id, l->op_id, fuckups);
-      fuckups++;
-      op_id = l->op_id+1;
-    }
-  }
-}
-
 void pipe_cycle_WB(Pipeline *p){
   int ii;  
 
@@ -518,17 +510,6 @@ void pipe_cycle_MEM(Pipeline *p){
 
 //--------------------------------------------------------------------//
 
-bool stall(Pipeline *p, uint8_t pipe) {
-
-  if (pipe == 0) {
-    return (p->pipe_latch[ID_LATCH][0].stall) || ((p->pipe_latch[ID_LATCH][0].op_id > p->pipe_latch[ID_LATCH][1].op_id) && p->pipe_latch[ID_LATCH][1].stall);
-  }
-
-  else {
-    return p->pipe_latch[ID_LATCH][1].stall;
-  }
-}
-
 void pipe_cycle_EX(Pipeline *p){
 
   int ii;
@@ -562,7 +543,6 @@ void pipe_cycle_ID(Pipeline *p){
 
     if (ii==0) {
       p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
-
     }  
     else {
       p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || check_hazards(p, ii);
