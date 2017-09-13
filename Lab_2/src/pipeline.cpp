@@ -137,184 +137,6 @@ void print_instruction(Pipeline_Latch* i)
   }
 }
 
-/*
-
-Pipeline_Latch mem[8];
-Pipeline_Latch ex[8];
-Pipeline_Latch id[8];
-Pipeline_Latch zero_pipe;
-
-bool stalls[8];
-
-bool hazard(int pipe)
-{
-
-  int i;
-  for(i=0; i<PIPE_WIDTH; i++) {
-
-    if (ex[i].tr_entry.dest_needed && 
-        ex[i].tr_entry.dest == id[pipe].tr_entry.src1_reg &&
-        id[pipe].tr_entry.src1_needed &&
-        ex[i].tr_entry.mem_read) {
-          return true; //p->stat_num_cycle+=1;
-    }
-    else if (ex[i].tr_entry.dest_needed && 
-        ex[i].tr_entry.dest == id[pipe].tr_entry.src2_reg &&
-        id[pipe].tr_entry.src2_needed &&
-        ex[i].tr_entry.mem_read) {
-          return true; //p->stat_num_cycle+=1;
-    }
-    else if(i < pipe &&
-        id[i].tr_entry.dest_needed && 
-        id[i].tr_entry.dest == id[pipe].tr_entry.src1_reg &&
-        id[pipe].tr_entry.src1_needed) {
-          return true;
-    }
-    else if(i < pipe &&
-        id[i].tr_entry.dest_needed && 
-        id[i].tr_entry.dest == id[pipe].tr_entry.src2_reg &&
-        id[pipe].tr_entry.src2_needed) {
-          return true;
-    }
-    else {
-      return false;  
-    }
-
-  }
-
-}
-
-
-
-void set_false()
-{
-  int i;
-  for(i=0; i<PIPE_WIDTH; i++)
-  {
-    stalls[i] = false;
-  }
-}
-
-
-void pipe_cycle(Pipeline *p)
-{
-
-  bool stall = false;
-  set_false();
-
-  p->stat_num_cycle++;
-
-  int i;
-  for(i=0; i<PIPE_WIDTH; i++)
-  {
-    if(id[i].op_id >= p->halt_op_id){
-      p->halt=true;
-    }
-
-    mem[i] = ex[i]; // set mem
-    ex[i] = id[i]; // set ex
-
-    // these are only done in first loop
-    pipe_get_fetch_op(p, &id[i]); // set id
-    print_instruction(&id[i]);
-    p->stat_retired_inst++;
-  }
-
-  for(i=0; i<PIPE_WIDTH; i++)
-  {
-    if (i == 0) {
-      stalls[i] = hazard(i);
-    }
-    else{
-      stalls[i] = stalls[i-1] || hazard(i);
-    }
-
-    stall = stall || stalls[i];
-  }
-
-  while(stall){
-
-    stall = false;
-
-    p->stat_num_cycle++;
-
-    for(i=0; i<PIPE_WIDTH; i++)
-    {
-      mem[i] = ex[i]; // set mem
-      if(!stalls[i]) {
-        ex[i] = id[i]; // set ex
-        id[i] = zero_pipe;
-      }
-      else {
-        ex[i] = zero_pipe;      
-      }
-    }
-
-    set_false();
-
-    for(i=0; i<PIPE_WIDTH; i++)
-    {
-      if (i == 0) {
-        stalls[i] = hazard(i);
-      }
-      else{
-        stalls[i] = stalls[i-1] || hazard(i);
-      }
-
-      stall = stall || stalls[i];
-    }
-  }
-}
-*/
-
-/*
-
-void pipe_cycle(Pipeline *p)
-{
-    p->stat_num_cycle++;
-
-    pipe_cycle_WB(p);
-    pipe_cycle_MEM(p);
-    pipe_cycle_EX(p);
-    pipe_cycle_ID(p);
-    pipe_cycle_FE(p);
-	    
-}
-
-
-
-uint64_t stat_optype_dyn[NUM_OP_TYPE] = { 0 };
-
-void pipe_cycle(Pipeline *p)
-{
-    Pipeline_Latch fetch_op;
-    pipe_get_fetch_op(p, &fetch_op); // set id
-
-    p->stat_num_cycle++;
-
-    print_instruction(&fetch_op);
-
-    // count regardless if valid
-    p->stat_retired_inst++;
-
-    if (fetch_op.valid) {
-      stat_optype_dyn[fetch_op.tr_entry.op_type]++;
-    }    
-
-    if(fetch_op.op_id >= p->halt_op_id){
-      p->halt=true;
-    }   
-
-    int i;
-    if (p->halt) {
-      for(i=0; i<NUM_OP_TYPE; i++) {
-        printf("%d : %lu\n", i, stat_optype_dyn[i]);
-      }
-    }
-}
-
-*/
-
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
@@ -335,9 +157,13 @@ uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type latch)
 {
   uint8_t order = 0;
   
+  if (!p->pipe_latch[latch][pipe].valid) {
+    return 0;
+  }
+
   int i;
   for(i=0; i<PIPE_WIDTH; i++) {
-    if (p->pipe_latch[latch][pipe].op_id > p->pipe_latch[latch][i].op_id)
+    if ( (p->pipe_latch[latch][pipe].op_id > p->pipe_latch[latch][i].op_id) && p->pipe_latch[latch][i].valid)
     {
       order++;
     }
@@ -353,8 +179,6 @@ uint8_t r_order(Pipeline *p, uint8_t index, Latch_Type latch)
       return i;
     }
   }
-  fprintf(stderr, "Invalid index: %d Max index = %d\n", index, PIPE_WIDTH);
-  assert(0);
 }
 
 bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
@@ -392,14 +216,14 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     return false;
   }
 
-  if (op_id1+1 < op_id2)
-  {
-    //assert(0);
-  }
-
-  if (op_id1 < op_id2)
+  if (op_id1 <= op_id2)
   {
     return false;
+  }
+
+  if (op_id1+1 < op_id2)
+  {
+    assert(0);
   }
 
   if (src1_needed && dest_needed && (src1 == dest)) {
@@ -408,7 +232,6 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
-      //printf("src1 hazard\n");
       return true;
     }
   }
@@ -419,7 +242,6 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
-      //printf("src2 hazard\n");
       return true;
     }
   }
@@ -430,7 +252,6 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
-      //printf("cc hazard\n");
       return true;
     }
   }
@@ -439,7 +260,6 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else{
-      //printf("Store - Load stall\n");
       return true;
     }
   }
@@ -452,7 +272,7 @@ bool check_hazards(Pipeline *p, uint8_t pipe)
 {
   int i;
   
-  for(i=pipe-1; i>=0; i--) {
+  for(i=PIPE_WIDTH-1; i>=0; i--) {
     if (check_hazard(p, pipe, i, ID_LATCH)) {
       return true;
     }
@@ -488,7 +308,6 @@ void pipe_cycle_WB(Pipeline *p){
 	      p->halt=true;
       }
     }
-
   }
 }
 
@@ -535,19 +354,19 @@ void pipe_cycle_ID(Pipeline *p){
   int j;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-
     if(!p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
       p->pipe_latch[FE_LATCH][ii].valid = 0;
     }
+  }
 
+  for(ii=0; ii<PIPE_WIDTH; ii++){
     if (ii==0) {
-      p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
+      p->pipe_latch[ID_LATCH][r_order(p, ii, ID_LATCH)].stall = check_hazards(p, r_order(p, ii, ID_LATCH));
     }  
     else {
-      p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || check_hazards(p, ii);
+      p->pipe_latch[ID_LATCH][r_order(p, ii, ID_LATCH)].stall = p->pipe_latch[ID_LATCH][r_order(p, ii-1, ID_LATCH)].stall || check_hazards(p, r_order(p, ii, ID_LATCH));
     }
-
   }
 
 }
