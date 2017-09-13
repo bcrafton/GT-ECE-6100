@@ -315,6 +315,10 @@ void pipe_cycle(Pipeline *p)
 
 */
 
+uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type)
+{
+}
+
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
@@ -331,22 +335,6 @@ void pipe_cycle(Pipeline *p)
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
 
-typedef struct register_map{
-  uint8_t inflight[32];
-  //uint8_t inflight_count[32];
-  Latch_Type stage[32];
-  uint8_t pipe[32];
-} register_map_t;
-
-typedef struct cc_map{
-  uint8_t inflight;
-  Latch_Type stage;
-  uint8_t pipe;
-} cc_map_t;
-
-static register_map_t reg_map;
-static cc_map_t cc_map;
-
 bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 {
 
@@ -362,6 +350,8 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
   uint8_t mem_read1 =   p->pipe_latch[ID_LATCH][pipe].tr_entry.mem_read;
   uint64_t mem_addr1 =  p->pipe_latch[ID_LATCH][pipe].tr_entry.mem_addr;
 
+  uint64_t op_id1 =  p->pipe_latch[ID_LATCH][pipe].op_id;
+
   // older
 
   uint8_t dest =        p->pipe_latch[stage2][pipe2].tr_entry.dest;
@@ -372,10 +362,21 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
   uint8_t mem_read2 =   p->pipe_latch[stage2][pipe2].tr_entry.mem_read;
   uint64_t mem_addr2 =  p->pipe_latch[stage2][pipe2].tr_entry.mem_addr;
   uint8_t mem_write2 =  p->pipe_latch[stage2][pipe2].tr_entry.mem_write;
+  uint64_t op_id2 =     p->pipe_latch[stage2][pipe2].op_id;
 
   // check
 
   if (!valid1 || !valid2) {
+    return false;
+  }
+
+  if (op_id1+1 < op_id2)
+  {
+    assert(0);
+  }
+
+  if (op_id1 < op_id2)
+  {
     return false;
   }
 
@@ -385,6 +386,7 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
+      //printf("src1 hazard\n");
       return true;
     }
   }
@@ -395,6 +397,7 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
+      //printf("src2 hazard\n");
       return true;
     }
   }
@@ -405,6 +408,7 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else {
+      //printf("cc hazard\n");
       return true;
     }
   }
@@ -413,6 +417,7 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
     if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
     }
     else{
+      //printf("Store - Load stall\n");
       return true;
     }
   }
@@ -424,79 +429,25 @@ bool check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
 bool check_hazards(Pipeline *p, uint8_t pipe)
 {
   int i;
-  for(i=0; i<pipe; i++) {
+  
+  for(i=pipe-1; i>=0; i--) {
     if (check_hazard(p, pipe, i, ID_LATCH)) {
-      return true;    
+      return true;
     }
   }
 
-  for(i=0; i<PIPE_WIDTH; i++) {
+  for(i=PIPE_WIDTH-1; i>=0; i--) {
     if (check_hazard(p, pipe, i, EX_LATCH)) {
       return true;    
     }
   }
 
-  for(i=0; i<PIPE_WIDTH; i++) {
+  for(i=PIPE_WIDTH-1; i>=0; i--) {
     if (check_hazard(p, pipe, i, MEM_LATCH)) {
       return true;    
     }
   }
   return false;
-}
-
-void update_regmap()
-{
-  int i;
-  for(i=0; i<32; i++){
-    if(reg_map.inflight[i]){
-
-        switch (reg_map.stage[i]) {
-        
-          case FE_LATCH:
-            // do nothing
-            break;
-          case ID_LATCH:
-            reg_map.stage[i] = EX_LATCH;
-            break;
-          case EX_LATCH:
-            reg_map.stage[i] = MEM_LATCH;
-            break;
-          case MEM_LATCH:
-            reg_map.stage[i] = FE_LATCH;
-            reg_map.inflight[i] = 0;
-            break;
-          default:
-            fprintf(stderr, "Error: Should not get anything besides EX/MEM here. Got: %d\n", reg_map.stage[i]);
-            assert(0);
-      }
-    }
-  }
-}
-
-void update_ccmap()
-{
-  if (cc_map.inflight)
-  {
-      switch (cc_map.stage) {
-      
-        case FE_LATCH:
-          // do nothing
-          break;
-        case ID_LATCH:
-          cc_map.stage = EX_LATCH;
-          break;
-        case EX_LATCH:
-          cc_map.stage = MEM_LATCH;
-          break;
-        case MEM_LATCH:
-          cc_map.stage = FE_LATCH;
-          cc_map.inflight = 0;
-          break;
-        default:
-          fprintf(stderr, "Error: Should not get anything besides EX/MEM here. Got: %d\n", cc_map.stage);
-          assert(0);
-    }
-  }
 }
 
 bool pipeline_stalled(Pipeline *p, uint8_t pipe)
@@ -521,7 +472,8 @@ void check_opid(Pipeline_Latch* l)
     }
     else
     {
-      printf("wrong op id: %lu %lu %lu\n", op_id, l->op_id, fuckups);
+      assert(0);
+      fprintf(stderr, "wrong op id: %lu %lu %lu\n", op_id, l->op_id, fuckups);
       fuckups++;
       op_id = l->op_id+1;
     }
@@ -535,7 +487,7 @@ void pipe_cycle_WB(Pipeline *p){
 
     if(p->pipe_latch[MEM_LATCH][ii].valid){
 
-      check_opid(&p->pipe_latch[MEM_LATCH][ii]);
+      //check_opid(&p->pipe_latch[MEM_LATCH][ii]);
 
       p->stat_retired_inst++;
       //printf("retired instructions: %lu\n", p->stat_retired_inst);
@@ -556,21 +508,32 @@ void pipe_cycle_MEM(Pipeline *p){
 
     p->pipe_latch[MEM_LATCH][ii]=p->pipe_latch[EX_LATCH][ii];
 
-    if (p->fetch_cbr_stall && p->pipe_latch[MEM_LATCH][ii].is_mispred_cbr) {
-      p->fetch_cbr_stall = false;
+    if(BPRED_POLICY){
+      if (p->fetch_cbr_stall && p->pipe_latch[MEM_LATCH][ii].is_mispred_cbr) {
+        p->fetch_cbr_stall = false;
+      }
     }
-
   }
 }
 
 //--------------------------------------------------------------------//
+
+bool stall(Pipeline *p, uint8_t pipe) {
+
+  if (pipe == 0) {
+    return (p->pipe_latch[ID_LATCH][0].stall) || ((p->pipe_latch[ID_LATCH][0].op_id > p->pipe_latch[ID_LATCH][1].op_id) && p->pipe_latch[ID_LATCH][1].stall);
+  }
+
+  else {
+    return p->pipe_latch[ID_LATCH][1].stall;
+  }
+}
 
 void pipe_cycle_EX(Pipeline *p){
 
   int ii;
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
-    // if the prev stage is stalled, whatever here is invalid.
     if(p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[EX_LATCH][ii].valid = 0;
     }
@@ -579,6 +542,7 @@ void pipe_cycle_EX(Pipeline *p){
       p->pipe_latch[EX_LATCH][ii]=p->pipe_latch[ID_LATCH][ii];
       p->pipe_latch[ID_LATCH][ii].valid = 0;
     }
+
   }
 }
 
@@ -590,17 +554,22 @@ void pipe_cycle_ID(Pipeline *p){
   int j;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-    if(!pipeline_stalled(p, ii)) {
+
+    if(!p->pipe_latch[ID_LATCH][ii].stall) {
       p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
       p->pipe_latch[FE_LATCH][ii].valid = 0;
     }
+
     if (ii==0) {
       p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
+
     }  
     else {
       p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii-1].stall || check_hazards(p, ii);
     }
+
   }
+
 }
 
 //--------------------------------------------------------------------//
@@ -610,7 +579,11 @@ void pipe_cycle_FE(Pipeline *p) {
   Pipeline_Latch fetch_op;
   bool tr_read_success;
 
+  // i do not think these must always be equal.
+  // assert(p->pipe_latch[FE_LATCH][0].valid == p->pipe_latch[FE_LATCH][1].valid);
+
   for(ii=0; ii<PIPE_WIDTH; ii++){
+
     if (!p->pipe_latch[FE_LATCH][ii].valid && !p->fetch_cbr_stall) {
       
       pipe_get_fetch_op(p, &fetch_op); 
