@@ -450,11 +450,12 @@ void pipe_cycle_ID(Pipeline *p){
   }
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-    if (ii==0) {
-      p->pipe_latch[ID_LATCH][r_order(p, ii, ID_LATCH)].stall = check_hazards(p, r_order(p, ii, ID_LATCH));
-    }  
-    else {
-      p->pipe_latch[ID_LATCH][r_order(p, ii, ID_LATCH)].stall = p->pipe_latch[ID_LATCH][r_order(p, ii-1, ID_LATCH)].stall || check_hazards(p, r_order(p, ii, ID_LATCH));
+    p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
+    for(j=0; j<PIPE_WIDTH; j++){
+      if (p->pipe_latch[ID_LATCH][ii].op_id > p->pipe_latch[ID_LATCH][j].op_id)
+      {
+        p->pipe_latch[ID_LATCH][ii].stall = p->pipe_latch[ID_LATCH][ii].stall || check_hazards(p, j);
+      }
     }
   }
 }
