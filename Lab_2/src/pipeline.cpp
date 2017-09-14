@@ -173,11 +173,18 @@ void pipe_cycle(Pipeline *p)
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
 
-typedef enum hazard {
-    NO_DEPEND,
-    DEPEND,
-    FORWARD
+typedef struct hazard {
+  uint64_t op_id;
+  bool hazard;
+  bool forward;
 } hazard_t; 
+
+typedef struct hazards {
+  hazard_t src1;
+  hazard_t src2;
+  hazard_t cc_read;
+  hazard_t mem;
+} hazards_t;
 
 uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type latch)
 {
@@ -208,7 +215,7 @@ uint8_t r_order(Pipeline *p, uint8_t index, Latch_Type latch)
   return 0;
 }
 
-hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2)
+void check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2, hazards_t* hazards)
 {
 
   // younger
@@ -240,12 +247,12 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
   // check
 
   if (!valid1 || !valid2) {
-    return NO_DEPEND;
+    return;
   }
 
   if (op_id1 <= op_id2)
   {
-    return NO_DEPEND;
+    return;
   }
 
   if ( ((op_id1+1 < op_id2) || (op_id2+1 < op_id1)) && (stage2 == ID_LATCH) )
@@ -255,112 +262,117 @@ hazard_t check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage
   }
 
   if (src1_needed && dest_needed && (src1 == dest)) {
-    if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
-      return FORWARD;
+    bool forward = false;
+    bool hazard = false;
+    if (ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
+      forward = true;
+      hazard = false;
     }
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
-      return FORWARD;
+      forward = true;
+      hazard = false;
     }
     else {
-      printf("stall src1 opid = %lu %lu\n", op_id1, op_id2);
-      return DEPEND;
+      forward = false;
+      hazard = true;
+    }
+
+    if (((hazards->src1.hazard || hazards->src1.forward) && (op_id2 > hazards->src1.op_id)) || (!hazards->src1.hazard && !hazards->src1.forward))
+    {
+      hazards->src1.forward = forward;
+      hazards->src1.hazard = hazard;
+      hazards->src1.op_id = op_id2;
     }
   }
 
   if (src2_needed && dest_needed && (src2 == dest)) {
+    bool forward = false;
+    bool hazard = false;
     if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
-      return FORWARD;
+      forward = true;
+      hazard = false;
     }
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
-      return FORWARD;
+      forward = true;
+      hazard = false;
     }
     else {
-      printf("stall src2 opid = %lu %lu\n", op_id1, op_id2);
-      return DEPEND;
+      forward = false;
+      hazard = true;
+    }
+
+    if (((hazards->src2.hazard || hazards->src2.forward) && (op_id2 > hazards->src2.op_id)) || (!hazards->src2.hazard && !hazards->src2.forward))
+    {
+      hazards->src2.forward = forward;
+      hazards->src2.hazard = hazard;
+      hazards->src2.op_id = op_id2;
     }
   }
 
   if (cc_read && cc_write) {
+
+    bool forward = false;
+    bool hazard = false;
     if(ENABLE_EXE_FWD && (stage2 == EX_LATCH)){
-      return FORWARD;
+      forward = true;
+      hazard = false;
     }
     else if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
-      return FORWARD;
+      forward = true;
+      hazard = false;
     }
     else {
-      printf("stall cc opid = %lu %lu\n", op_id1, op_id2);
-      return DEPEND;
+      forward = false;
+      hazard = true;
+    }
+
+    if (((hazards->cc_read.hazard || hazards->cc_read.forward) && (op_id2 > hazards->cc_read.op_id)) || (!hazards->cc_read.hazard && !hazards->cc_read.forward))
+    {
+      hazards->cc_read.forward = forward;
+      hazards->cc_read.hazard = hazard;
+      hazards->cc_read.op_id = op_id2;
     }
   }
 
   if (mem_read1 && mem_write2 && (mem_addr1 == mem_addr2)){
+    bool forward = false;
+    bool hazard = false;
     if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
-      return FORWARD;
+      forward = true;
+      hazard = false;
     }
     else{
-      printf("stall mem opid = %lu %lu\n", op_id1, op_id2);
-      return DEPEND;
+      forward = false;
+      hazard = true;
+    }
+
+    if (((hazards->mem.hazard || hazards->mem.forward) && (op_id2 > hazards->mem.op_id)) || (!hazards->mem.hazard && !hazards->mem.forward))
+    {
+      hazards->mem.forward = forward;
+      hazards->mem.hazard = hazard;
+      hazards->mem.op_id = op_id2;
     }
   }
-
-  return NO_DEPEND;
-
 }
 
 bool check_hazards(Pipeline *p, uint8_t pipe)
 {
   int i;
-  hazard_t hazard;  
+  hazards_t hazards = {0,};  
 
   for(i=PIPE_WIDTH-1; i>=0; i--) {
-    hazard = check_hazard(p, pipe, i, ID_LATCH);
-    if (hazard == NO_DEPEND) {
-    }
-    else if (hazard == DEPEND) {
-      //printf("id\n");
-      return true;    
-    }
-    else {
-      fprintf(stderr, "Invalid hazard type %u\n", hazard);
-      assert(0);    
-    }
+    check_hazard(p, pipe, i, ID_LATCH, &hazards);
   }
 
   for(i=PIPE_WIDTH-1; i>=0; i--) {
-    hazard = check_hazard(p, pipe, i, EX_LATCH);
-    if (hazard == NO_DEPEND) {
-    }
-    else if (hazard == DEPEND) {
-      //printf("ex\n");
-      return true;    
-    }
-    else if (hazard == FORWARD) {
-      return false;    
-    }
-    else {
-      fprintf(stderr, "Invalid hazard type %u\n", hazard);
-      assert(0);    
-    }
+    check_hazard(p, pipe, i, EX_LATCH, &hazards);
   }
 
   for(i=PIPE_WIDTH-1; i>=0; i--) {
-    hazard = check_hazard(p, pipe, i, MEM_LATCH);
-    if (hazard == NO_DEPEND) {
-    }
-    else if (hazard == DEPEND) {
-      //printf("mem\n");
-      return true;    
-    }
-    else if (hazard == FORWARD) {
-      return false;    
-    }
-    else {
-      fprintf(stderr, "Invalid hazard type %u\n", hazard);
-      assert(0);    
-    }
+    check_hazard(p, pipe, i, MEM_LATCH,  &hazards);
   }
 
-  return NO_DEPEND;
+  return hazards.src1.hazard || hazards.src2.hazard || hazards.cc_read.hazard || hazards.mem.hazard;
 }
 
 void pipe_cycle_WB(Pipeline *p){
