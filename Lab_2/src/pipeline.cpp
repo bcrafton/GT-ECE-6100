@@ -159,6 +159,7 @@ void pipe_cycle(Pipeline *p)
     print_instruction(&p->pipe_latch[MEM_LATCH][1]);
     print_instruction(&p->pipe_latch[EX_LATCH][0]);
     print_instruction(&p->pipe_latch[EX_LATCH][1]);
+
     print_instruction(&p->pipe_latch[ID_LATCH][0]);
     print_instruction(&p->pipe_latch[ID_LATCH][1]);
 
@@ -190,6 +191,11 @@ uint8_t order(Pipeline *p, uint8_t pipe, Latch_Type latch)
 {
   uint8_t order = 0;
   
+  if (p->pipe_latch[latch][pipe].op_id == 0)
+  {
+    return pipe;
+  }
+
   if (!p->pipe_latch[latch][pipe].valid) {
     return PIPE_WIDTH-1;
   }
@@ -313,7 +319,7 @@ void check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2, h
 
     bool forward = false;
     bool hazard = false;
-    if(ENABLE_EXE_FWD && (stage2 == EX_LATCH)){
+    if(ENABLE_EXE_FWD && (stage2 == EX_LATCH) && !mem_read2){
       forward = true;
       hazard = false;
     }
@@ -484,7 +490,7 @@ void pipe_cycle_FE(Pipeline *p) {
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
-    if (!p->pipe_latch[FE_LATCH][r_order(p, ii, ID_LATCH)].valid && !p->fetch_cbr_stall) {
+    if (!p->pipe_latch[FE_LATCH][ii].valid && !p->fetch_cbr_stall) {
       
       pipe_get_fetch_op(p, &fetch_op); 
 
@@ -493,7 +499,7 @@ void pipe_cycle_FE(Pipeline *p) {
       }
       
       // copy the op in FE LATCH
-      p->pipe_latch[FE_LATCH][r_order(p, ii, ID_LATCH)]=fetch_op;
+      p->pipe_latch[FE_LATCH][ii]=fetch_op;
     }
   }
 }

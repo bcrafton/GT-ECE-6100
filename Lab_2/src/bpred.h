@@ -2,7 +2,9 @@
 #define _BPRED_H_
 #include <inttypes.h>
 
-
+#define BHT_SIZE 12
+#define BHT_MASK ((1 << 12) - 1)
+#define PHT_SIZE (1 << 12)
 
 static inline uint32_t SatIncrement(uint32_t x, uint32_t max)
 {
@@ -34,6 +36,9 @@ class BPRED{
 public:
   uint64_t stat_num_branches;
   uint64_t stat_num_mispred;
+
+  uint8_t pht[PHT_SIZE];
+  uint32_t bht;
   
 // The interface to the three functions below CAN NOT be changed
     BPRED(uint32_t policy);

@@ -10,13 +10,28 @@ BPRED::BPRED(uint32_t policy) {
     this->policy = (BPRED_TYPE) policy;
     this->stat_num_branches = 0;
     this->stat_num_mispred = 0;
+  
+    int i;
+    for (i = 0; i < PHT_SIZE; i++)
+    {
+      this->pht[i] = 2;
+    }
+
+    this->bht = 0;
 }
 
 /////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
 
 bool BPRED::GetPrediction(uint32_t PC){
-    return TAKEN;
+
+    if(this->policy == BPRED_ALWAYS_TAKEN){
+      return true;
+    }
+    else if(this->policy == BPRED_GSHARE){
+      uint32_t address = (PC & this->bht) & BHT_MASK;
+      return this->pht[address] >= 2;
+    }
 }
 
 
@@ -24,7 +39,7 @@ bool BPRED::GetPrediction(uint32_t PC){
 /////////////////////////////////////////////////////////////
 
 void BPRED::UpdatePredictor(uint32_t PC, bool resolveDir, bool predDir) {
-    // dont care about this one yet
+  uint32_t address = (PC & this->bht) & BHT_MASK;
 }
 
 /////////////////////////////////////////////////////////////
