@@ -263,8 +263,8 @@ void check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2, h
 
   if ( ((op_id1+1 < op_id2) || (op_id2+1 < op_id1)) && (stage2 == ID_LATCH) )
   {
-    fprintf(stderr, "id1 id2: %lu %lu\n", op_id1, op_id2);
-    assert(0);
+    //fprintf(stderr, "id1 id2: %lu %lu\n", op_id1, op_id2);
+    //assert(0);
   }
 
   if (src1_needed && dest_needed && (src1 == dest)) {
@@ -518,13 +518,16 @@ void pipe_check_bpred(Pipeline *p, Pipeline_Latch *fetch_op) {
   if (fetch_op->tr_entry.op_type == OP_CBR)
   {
     p->b_pred->stat_num_branches++;
-    if(!fetch_op->tr_entry.br_dir)
+    bool pred = p->b_pred->GetPrediction(fetch_op->tr_entry.inst_addr);
+    if(pred != fetch_op->tr_entry.br_dir)
     {
       p->b_pred->stat_num_mispred++;      
 
       fetch_op->is_mispred_cbr = true;
       p->fetch_cbr_stall = true;
     }
+    // may have to change order or pred and br.
+    p->b_pred->UpdatePredictor(fetch_op->tr_entry.inst_addr, fetch_op->tr_entry.br_dir, pred);
   }
 }
 
