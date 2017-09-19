@@ -29,7 +29,7 @@ bool BPRED::GetPrediction(uint32_t PC){
       return true;
     }
     else if(this->policy == BPRED_GSHARE){
-      uint32_t address = (PC & this->bht) & BHT_MASK;
+      uint32_t address = (PC ^ this->bht) & BHT_MASK;
       return this->pht[address] >= 2;
     }
     else {
@@ -42,15 +42,15 @@ bool BPRED::GetPrediction(uint32_t PC){
 /////////////////////////////////////////////////////////////
 
 void BPRED::UpdatePredictor(uint32_t PC, bool resolveDir, bool predDir) {
-  uint32_t address = (PC & this->bht) & BHT_MASK;
+  uint32_t address = (PC ^ this->bht) & BHT_MASK;
   this->bht = (this->bht << 1) | resolveDir;
   if (resolveDir)
   {
-    this->pht[address] = this->pht[address] == 3 ? 3 : this->pht[address] + 1;
+    this->pht[address] = (this->pht[address] == 3) ? 3 : (this->pht[address] + 1);
   }
   else 
   {
-    this->pht[address] = this->pht[address] == 0 ? 0 : this->pht[address] - 1;
+    this->pht[address] = (this->pht[address] == 0) ? 0 : (this->pht[address] - 1);
   }
 }
 

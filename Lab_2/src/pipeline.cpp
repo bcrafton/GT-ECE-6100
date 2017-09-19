@@ -67,7 +67,7 @@ Pipeline * pipe_init(FILE *tr_file_in){
 
 void pipe_print_state(Pipeline *p){
     std::cout << "--------------------------------------------" << std::endl;
-    std::cout <<"cycle count : " << p->stat_num_cycle << " retired_instruction : " << p->stat_retired_inst << " retired inst number : " << p->stat_retired_inst << std::endl;
+    std::cout <<"cycle count : " << p->stat_num_cycle << " retired_instruction : " << p->stat_retired_inst << std::endl;
 
     uint8_t latch_type_i = 0;   // Iterates over Latch Types
     uint8_t width_i      = 0;   // Iterates over Pipeline Width
@@ -162,9 +162,9 @@ void pipe_cycle(Pipeline *p)
 
     print_instruction(&p->pipe_latch[ID_LATCH][0]);
     print_instruction(&p->pipe_latch[ID_LATCH][1]);
-
-    pipe_print_state(p);
 */
+    //pipe_print_state(p);
+
 
 
 	    
