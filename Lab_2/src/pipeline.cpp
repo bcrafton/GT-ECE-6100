@@ -109,43 +109,8 @@ void pipe_print_state(Pipeline *p){
  * Pipeline Main Function: Every cycle, cycle the stage 
  **********************************************************************/
 
-void print_instruction(Pipeline_Latch* i)
-{
-  if (1) {
-    printf("%lu | %d %d | %d %d | %d %d | %lx %d %d | %d | %d %d %d %d | %d %d\n",
-
-    i->op_id,
-
-    i->tr_entry.src1_reg,
-    i->tr_entry.src1_needed,
-
-    i->tr_entry.src2_reg,
-    i->tr_entry.src2_needed,
-
-    i->tr_entry.dest,
-    i->tr_entry.dest_needed,
-
-    i->tr_entry.mem_addr,
-    i->tr_entry.mem_write,
-    i->tr_entry.mem_read,
-
-    i->tr_entry.op_type,
-
-    i->tr_entry.cc_read,
-    i->tr_entry.cc_write,
-    i->tr_entry.br_dir,
-    i->is_mispred_cbr,
-
-    i->stall,
-    i->valid
-
-    );
-  }
-}
-
 void pipe_cycle(Pipeline *p)
 {
-
     p->stat_num_cycle++;
 
     pipe_cycle_WB(p);
@@ -153,23 +118,8 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_EX(p);
     pipe_cycle_ID(p);
     pipe_cycle_FE(p);
-
-/*
-    print_instruction(&p->pipe_latch[MEM_LATCH][0]);
-    print_instruction(&p->pipe_latch[MEM_LATCH][1]);
-    print_instruction(&p->pipe_latch[EX_LATCH][0]);
-    print_instruction(&p->pipe_latch[EX_LATCH][1]);
-
-    print_instruction(&p->pipe_latch[ID_LATCH][0]);
-    print_instruction(&p->pipe_latch[ID_LATCH][1]);
-*/
-    //pipe_print_state(p);
-
-
-
 	    
 }
-
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
