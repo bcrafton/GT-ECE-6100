@@ -109,6 +109,40 @@ void pipe_print_state(Pipeline *p){
  * Pipeline Main Function: Every cycle, cycle the stage 
  **********************************************************************/
 
+void print_instruction(Pipeline_Latch* i)
+{
+  if (1) {
+    printf("%lu | %d %d | %d %d | %d %d | %lx %d %d | %d | %d %d %d %d | %d %d\n",
+
+    i->op_id,
+
+    i->tr_entry.src1_reg,
+    i->tr_entry.src1_needed,
+
+    i->tr_entry.src2_reg,
+    i->tr_entry.src2_needed,
+
+    i->tr_entry.dest,
+    i->tr_entry.dest_needed,
+
+    i->tr_entry.mem_addr,
+    i->tr_entry.mem_write,
+    i->tr_entry.mem_read,
+
+    i->tr_entry.op_type,
+
+    i->tr_entry.cc_read,
+    i->tr_entry.cc_write,
+    i->tr_entry.br_dir,
+    i->is_mispred_cbr,
+
+    i->stall,
+    i->valid
+
+    );
+  }
+}
+
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
@@ -118,11 +152,20 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_EX(p);
     pipe_cycle_ID(p);
     pipe_cycle_FE(p);
+
+    // pipe_print_state(p);
+
+    // print_instruction(&p->pipe_latch[FE_LATCH][0]);
+    // print_instruction(&p->pipe_latch[FE_LATCH][1]);
+    // print_instruction(&p->pipe_latch[ID_LATCH][0]);
+    // print_instruction(&p->pipe_latch[ID_LATCH][1]);
 	    
 }
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
+
+
 
 typedef struct hazard {
   uint64_t op_id;
@@ -213,8 +256,8 @@ void check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2, h
 
   if ( ((op_id1+1 < op_id2) || (op_id2+1 < op_id1)) && (stage2 == ID_LATCH) )
   {
-    //fprintf(stderr, "id1 id2: %lu %lu\n", op_id1, op_id2);
-    //assert(0);
+    fprintf(stderr, "id1 id2: %lu %lu\n", op_id1, op_id2);
+    assert(0);
   }
 
   if (src1_needed && dest_needed && (src1 == dest)) {
@@ -290,7 +333,7 @@ void check_hazard(Pipeline *p, uint8_t pipe, uint8_t pipe2, Latch_Type stage2, h
     }
   }
 
-  if (mem_read1 && mem_write2 && (mem_addr1 == mem_addr2)){
+  if (mem_read1 && mem_write2 && (mem_addr1 == mem_addr2) && (stage2 == ID_LATCH)){
     bool forward = false;
     bool hazard = false;
     if(ENABLE_MEM_FWD && (stage2 == MEM_LATCH)) {
