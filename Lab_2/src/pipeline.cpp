@@ -109,40 +109,6 @@ void pipe_print_state(Pipeline *p){
  * Pipeline Main Function: Every cycle, cycle the stage 
  **********************************************************************/
 
-void print_instruction(Pipeline_Latch* i)
-{
-  if (1) {
-    printf("%lu | %d %d | %d %d | %d %d | %lx %d %d | %d | %d %d %d %d | %d %d\n",
-
-    i->op_id,
-
-    i->tr_entry.src1_reg,
-    i->tr_entry.src1_needed,
-
-    i->tr_entry.src2_reg,
-    i->tr_entry.src2_needed,
-
-    i->tr_entry.dest,
-    i->tr_entry.dest_needed,
-
-    i->tr_entry.mem_addr,
-    i->tr_entry.mem_write,
-    i->tr_entry.mem_read,
-
-    i->tr_entry.op_type,
-
-    i->tr_entry.cc_read,
-    i->tr_entry.cc_write,
-    i->tr_entry.br_dir,
-    i->is_mispred_cbr,
-
-    i->stall,
-    i->valid
-
-    );
-  }
-}
-
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
@@ -152,14 +118,6 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_EX(p);
     pipe_cycle_ID(p);
     pipe_cycle_FE(p);
-
-    // pipe_print_state(p);
-
-    // print_instruction(&p->pipe_latch[FE_LATCH][0]);
-    // print_instruction(&p->pipe_latch[FE_LATCH][1]);
-    // print_instruction(&p->pipe_latch[ID_LATCH][0]);
-    // print_instruction(&p->pipe_latch[ID_LATCH][1]);
-	    
 }
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
@@ -451,17 +409,23 @@ void pipe_cycle_ID(Pipeline *p){
   int j;
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
-
-    //print_instruction(&p->pipe_latch[FE_LATCH][ii]);
-
-    if(!p->pipe_latch[ID_LATCH][ii].stall) {
-      p->pipe_latch[ID_LATCH][ii]=p->pipe_latch[FE_LATCH][ii];
-      p->pipe_latch[FE_LATCH][ii].valid = 0;
+    uint64_t min=p->pipe_latch[FE_LATCH][j].op_id;
+    uint8_t pipe=0;
+    for(j=1; j<PIPE_WIDTH; j++){
+      if ((p->pipe_latch[FE_LATCH][j].op_id < min) && p->pipe_latch[FE_LATCH][j].valid) {
+        min = p->pipe_latch[FE_LATCH][j].op_id;
+        pipe = j;
+      }
+    }
+    if(!p->pipe_latch[ID_LATCH][pipe].stall && p->pipe_latch[FE_LATCH][pipe].valid) {
+      p->pipe_latch[ID_LATCH][pipe]=p->pipe_latch[FE_LATCH][pipe];
+      p->pipe_latch[FE_LATCH][pipe].valid = 0;
     }
   }
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
     p->pipe_latch[ID_LATCH][ii].stall = check_hazards(p, ii);
+
     for(j=0; j<PIPE_WIDTH; j++){
       if (p->pipe_latch[ID_LATCH][ii].op_id > p->pipe_latch[ID_LATCH][j].op_id)
       {
@@ -474,7 +438,7 @@ void pipe_cycle_ID(Pipeline *p){
 //--------------------------------------------------------------------//
 
 void pipe_cycle_FE(Pipeline *p) {
-  int ii;
+  int ii, j;
   Pipeline_Latch fetch_op;
   bool tr_read_success;
 
@@ -495,6 +459,17 @@ void pipe_cycle_FE(Pipeline *p) {
       p->pipe_latch[FE_LATCH][ii]=fetch_op;
     }
   }
+
+  for(ii=0; ii<PIPE_WIDTH; ii++){
+    for(j=0; j<PIPE_WIDTH; j++){
+      if ( (p->pipe_latch[ID_LATCH][ii].op_id > p->pipe_latch[FE_LATCH][j].op_id) &&
+           (p->pipe_latch[ID_LATCH][ii].valid && p->pipe_latch[FE_LATCH][j].valid) )
+      {
+        p->pipe_latch[ID_LATCH][ii].stall = true;
+      }
+    }
+  }
+
 }
 
 

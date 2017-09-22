@@ -1,0 +1,11 @@
+
+*.head
+*.rpt
+*.o
+*.tar.gz
+
+ignore/
+ignore/*
+
+*sim
+*out
