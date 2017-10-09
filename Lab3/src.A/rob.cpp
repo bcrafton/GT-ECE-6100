@@ -6,6 +6,8 @@
 
 extern int32_t NUM_ROB_ENTRIES;
 
+static int rob_count;
+
 /////////////////////////////////////////////////////////////
 // Init function initializes the ROB
 /////////////////////////////////////////////////////////////
@@ -47,7 +49,7 @@ void ROB_print_state(ROB *t){
 /////////////////////////////////////////////////////////////
 
 bool ROB_check_space(ROB *t){
-
+  return rob_count < MAX_ROB_ENTRIES;
 }
 
 /////////////////////////////////////////////////////////////
@@ -55,8 +57,14 @@ bool ROB_check_space(ROB *t){
 /////////////////////////////////////////////////////////////
 
 int ROB_insert(ROB *t, Inst_Info inst){
-  
+  // tail ptr will point to next available OPEN slot
 
+  assert( assert(ROB_check_space(t)) );
+  assert( !t->ROB_Entries[tail_ptr].valid );
+  assert( !t->ROB_Entries[tail_ptr].ready );
+
+  t->ROB_Entries[tail_ptr] = inst;
+  t->ROB_Entries[tail_ptr].valid = true;
 }
 
 /////////////////////////////////////////////////////////////
@@ -64,7 +72,10 @@ int ROB_insert(ROB *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void ROB_mark_ready(ROB *t, Inst_Info inst){
-
+  int i;
+  for(i=0; i<MAX_ROB_ENTRIES; i++) {
+    assert( !t->ROB_Entries[tail_ptr].ready );
+  }
 }
 
 /////////////////////////////////////////////////////////////

@@ -5,6 +5,10 @@
 
 extern int32_t NUM_REST_ENTRIES;
 
+static int count = 0;
+static int rd = 0;
+static int wr = 0;
+
 /////////////////////////////////////////////////////////////
 // Init function initializes the Reservation Station
 /////////////////////////////////////////////////////////////
@@ -48,7 +52,15 @@ void REST_print_state(REST *t){
 /////////////////////////////////////////////////////////////
 
 bool  REST_check_space(REST *t){
+  // return count < MAX_REST_ENTRIES;
 
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if (t->REST_Entries[i].valid) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /////////////////////////////////////////////////////////////
@@ -56,7 +68,21 @@ bool  REST_check_space(REST *t){
 /////////////////////////////////////////////////////////////
 
 void  REST_insert(REST *t, Inst_Info inst){
+  assert( REST_check_space(t) );
 
+  // t->REST_Entries[wr] = inst;
+  // wr = wr+1 == MAX_REST_ENTRIES ? 0 : wr+1;
+
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if ( !t->REST_Entries[i].valid ) {
+      // putting in assertions to maintain invariants.
+      assert( !t->REST_Entries[i].scheduled );
+
+      t->REST_Entries[i].inst = inst;
+      t->REST_Entries[i].valid = true;
+    }
+  }
 }
 
 /////////////////////////////////////////////////////////////
@@ -64,7 +90,17 @@ void  REST_insert(REST *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void  REST_remove(REST *t, Inst_Info inst){
-
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if(t->REST_Entries[i].inst == inst) {
+      // assert it is valid before removing
+      assert( t->REST_Entries[i].valid );
+      t->REST_Entries[i].valid = false;
+      t->REST_Entries[i].scheduled = false;
+    }
+  }
+  // assert that we did actually find this instruction
+  assert(0);
 }
 
 /////////////////////////////////////////////////////////////
@@ -72,7 +108,17 @@ void  REST_remove(REST *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void  REST_wakeup(REST *t, int tag){
-
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if(t->REST_Entries[i].valid) {
+      if (t->REST_Entries[i].inst.src1_tag != -1 && t->REST_Entries[i].inst.src1_tag == tag) {
+        t->REST_Entries[i].inst.src1_tag = -1;
+      }
+      if (t->REST_Entries[i].inst.src2_tag != -1 && t->REST_Entries[i].inst.src2_tag == tag) {
+        t->REST_Entries[i].inst.src2_tag = -1;
+      }
+    }
+  }
 }
 
 /////////////////////////////////////////////////////////////
@@ -80,5 +126,30 @@ void  REST_wakeup(REST *t, int tag){
 /////////////////////////////////////////////////////////////
 
 void  REST_schedule(REST *t, Inst_Info inst){
-
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if(t->REST_Entries[i].inst == inst) {
+      // assert it is valid before removing
+      assert( t->REST_Entries[i].valid );
+      t->REST_Entries[i].scheduled = true;
+    }
+  }
+  // assert that we did actually find this instruction
+  assert(0);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
