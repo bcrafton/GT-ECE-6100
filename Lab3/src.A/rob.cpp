@@ -59,8 +59,7 @@ bool ROB_check_space(ROB *t){
 /////////////////////////////////////////////////////////////
 
 int ROB_insert(ROB *t, Inst_Info inst){
-  // tail ptr will point to next available OPEN slot
-
+  assert( inst.dr_tag == -1);
   assert( ROB_check_space(t) );
   assert( !t->ROB_Entries[t->tail_ptr].valid );
   assert( !t->ROB_Entries[t->tail_ptr].ready );
@@ -68,6 +67,9 @@ int ROB_insert(ROB *t, Inst_Info inst){
   rob_count ++;
 
   t->ROB_Entries[t->tail_ptr].inst = inst;
+
+  // we are naming this here.
+  t->ROB_Entries[t->tail_ptr].inst.dr_tag = t->tail_ptr;
   t->ROB_Entries[t->tail_ptr].valid = true;
 
   int old_tail = t->tail_ptr;
@@ -81,6 +83,7 @@ int ROB_insert(ROB *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void ROB_mark_ready(ROB *t, Inst_Info inst){
+  assert( inst.dr_tag != -1);
   assert( !t->ROB_Entries[inst.dr_tag].ready );
   t->ROB_Entries[inst.dr_tag].ready = true;
 }

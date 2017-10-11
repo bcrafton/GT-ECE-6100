@@ -78,6 +78,7 @@ void  REST_insert(REST *t, Inst_Info inst){
   assert( REST_check_space(t) );
 
   // putting in assertions to maintain invariants.
+  assert( inst.dr_tag != -1);
   assert( !t->REST_Entries[inst.dr_tag].scheduled );
   assert( !t->REST_Entries[inst.dr_tag].valid );
 
@@ -92,6 +93,7 @@ void  REST_insert(REST *t, Inst_Info inst){
 
 void  REST_remove(REST *t, Inst_Info inst){
   // assert it is valid before removing
+  assert( inst.dr_tag != -1);
   assert( t->REST_Entries[inst.dr_tag].valid );
   t->REST_Entries[inst.dr_tag].valid = false;
   t->REST_Entries[inst.dr_tag].scheduled = false;
@@ -121,6 +123,7 @@ void  REST_wakeup(REST *t, int tag){
 /////////////////////////////////////////////////////////////
 
 void  REST_schedule(REST *t, Inst_Info inst){
+  assert( inst.dr_tag != -1);
   assert( t->REST_Entries[inst.dr_tag].valid );
   assert( !t->REST_Entries[inst.dr_tag].scheduled );
   t->REST_Entries[inst.dr_tag].scheduled = true;
