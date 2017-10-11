@@ -3,6 +3,9 @@
 
 #include "rat.h"
 
+// static int rd = 0; 
+// static int wr = 0;
+// static int count = 0;
 
 /////////////////////////////////////////////////////////////
 // Init function initializes the RAT
@@ -40,7 +43,8 @@ void RAT_print_state(RAT *t){
 /////////////////////////////////////////////////////////////
 
 int  RAT_get_remap(RAT *t, int arf_id){
-
+  assert(t->RAT_Entries[arf_id].valid);
+  return t->RAT_Entries[arf_id].prf_id;
 }
 
 /////////////////////////////////////////////////////////////
@@ -48,7 +52,8 @@ int  RAT_get_remap(RAT *t, int arf_id){
 /////////////////////////////////////////////////////////////
 
 void RAT_set_remap(RAT *t, int arf_id, int prf_id){
-
+  t->RAT_Entries[arf_id].prf_id = prf_id;
+  t->RAT_Entries[arf_id].valid = true;
 }
 
 /////////////////////////////////////////////////////////////
@@ -56,7 +61,7 @@ void RAT_set_remap(RAT *t, int arf_id, int prf_id){
 /////////////////////////////////////////////////////////////
 
 void RAT_reset_entry(RAT *t, int arf_id){
-
+  t->RAT_Entries[arf_id].valid = false;
 }
 
 

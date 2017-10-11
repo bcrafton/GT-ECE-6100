@@ -5,6 +5,11 @@
 
 extern int32_t NUM_REST_ENTRIES;
 
+// do we really need separate vars for rat, rt, rob
+static int rest_count = 0;
+// static int rd = 0;
+// static int wr = 0;
+
 /////////////////////////////////////////////////////////////
 // Init function initializes the Reservation Station
 /////////////////////////////////////////////////////////////
@@ -49,6 +54,20 @@ void REST_print_state(REST *t){
 
 bool  REST_check_space(REST *t){
 
+  // we are double doing this
+  // need to compile separately.
+  return rest_count < MAX_REST_ENTRIES;
+
+/*
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if (t->REST_Entries[i].valid) {
+      return true;
+    }
+  }
+  return false;
+*/
+
 }
 
 /////////////////////////////////////////////////////////////
@@ -56,7 +75,16 @@ bool  REST_check_space(REST *t){
 /////////////////////////////////////////////////////////////
 
 void  REST_insert(REST *t, Inst_Info inst){
+  assert( REST_check_space(t) );
 
+  // putting in assertions to maintain invariants.
+  assert( inst.dr_tag != -1);
+  assert( !t->REST_Entries[inst.dr_tag].scheduled );
+  assert( !t->REST_Entries[inst.dr_tag].valid );
+
+  t->REST_Entries[inst.dr_tag].inst = inst;
+  t->REST_Entries[inst.dr_tag].valid = true;
+  rest_count++;
 }
 
 /////////////////////////////////////////////////////////////
@@ -64,7 +92,12 @@ void  REST_insert(REST *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void  REST_remove(REST *t, Inst_Info inst){
-
+  // assert it is valid before removing
+  assert( inst.dr_tag != -1);
+  assert( t->REST_Entries[inst.dr_tag].valid );
+  t->REST_Entries[inst.dr_tag].valid = false;
+  t->REST_Entries[inst.dr_tag].scheduled = false;
+  rest_count--;
 }
 
 /////////////////////////////////////////////////////////////
@@ -72,7 +105,17 @@ void  REST_remove(REST *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void  REST_wakeup(REST *t, int tag){
-
+  int i;
+  for(i=0; i<MAX_REST_ENTRIES; i++) {
+    if(t->REST_Entries[i].valid) {
+      if (t->REST_Entries[i].inst.src1_tag != -1 && t->REST_Entries[i].inst.src1_tag == tag) {
+        t->REST_Entries[i].inst.src1_tag = -1;
+      }
+      if (t->REST_Entries[i].inst.src2_tag != -1 && t->REST_Entries[i].inst.src2_tag == tag) {
+        t->REST_Entries[i].inst.src2_tag = -1;
+      }
+    }
+  }
 }
 
 /////////////////////////////////////////////////////////////
@@ -80,5 +123,24 @@ void  REST_wakeup(REST *t, int tag){
 /////////////////////////////////////////////////////////////
 
 void  REST_schedule(REST *t, Inst_Info inst){
-
+  assert( inst.dr_tag != -1);
+  assert( t->REST_Entries[inst.dr_tag].valid );
+  assert( !t->REST_Entries[inst.dr_tag].scheduled );
+  t->REST_Entries[inst.dr_tag].scheduled = true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
