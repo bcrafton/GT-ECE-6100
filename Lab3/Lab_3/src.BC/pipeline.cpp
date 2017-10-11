@@ -273,20 +273,42 @@ void pipe_cycle_exe(Pipeline *p){
 
 void pipe_cycle_rename(Pipeline *p){
 
-  // TODO: If src1/src2 is remapped set src1tag, src2tag
-  // TODO: Find space in ROB and set drtag as such if successful
-  // TODO: Find space in REST and transfer this inst (valid=1, sched=0)
-  // TODO: If src1/src2 is not remapped marked as src ready
-  // TODO: If src1/src2 remapped and the ROB (tag) is ready then mark src ready
-  // FIXME: If there is stall, we should not do rename and ROB alloc twice
+  
+  int i;
+  for(i=0; i<MAX_PIPE_WIDTH; i++) {
 
+    Inst_Info id_inst = p->ID_latch[i].inst;
+
+    // todo: If src1/src2 is remapped set src1tag, src2tag
+    // check RAT
+    // where do we do this operatrion? REST?
+
+    // todo: Find space in ROB and set drtag as such if successful
+    if ( ROB_check_space( p->pipe_ROB ) )
+    {
+      ROB_insert( p->pipe_ROB, id_inst );
+    }
+
+    // todo: Find space in REST and transfer this inst (valid=1, sched=0)
+    if ( REST_check_space( p->pipe_REST ) )
+    {
+      REST_insert( p->pipe_REST, id_inst );
+    }
+
+    // todo: If src1/src2 is not remapped marked as src ready
+    // check the RAT
+
+    // todo: If src1/src2 remapped and the ROB (tag) is ready then mark src ready
+
+    // fixme: If there is stall, we should not do rename and ROB alloc twice
+  }
 }
 
 //--------------------------------------------------------------------//
 
 void pipe_cycle_schedule(Pipeline *p){
 
-  // TODO: Implement two scheduling policies (SCHED_POLICY: 0 and 1)
+  // todo: Implement two scheduling policies (SCHED_POLICY: 0 and 1)
 
   if(SCHED_POLICY==0){
     // inorder scheduling
@@ -306,10 +328,10 @@ void pipe_cycle_schedule(Pipeline *p){
 
 void pipe_cycle_broadcast(Pipeline *p){
 
-  // TODO: Go through all instructions out of EXE latch
-  // TODO: Broadcast it to REST (using wakeup function)
-  // TODO: Remove entry from REST (using inst_num)
-  // TODO: Update the ROB, mark ready, and update Inst Info in ROB
+  // todo: Go through all instructions out of EXE latch
+  // todo: Broadcast it to REST (using wakeup function)
+  // todo: Remove entry from REST (using inst_num)
+  // todo: Update the ROB, mark ready, and update Inst Info in ROB
  
 }
 
@@ -320,9 +342,9 @@ void pipe_cycle_broadcast(Pipeline *p){
 void pipe_cycle_commit(Pipeline *p) {
   int ii = 0;
 
-  // TODO: check the head of the ROB. If ready commit (update stats)
-  // TODO: Deallocate entry from ROB
-  // TODO: Update RAT after checking if the mapping is still valid
+  // todo: check the head of the ROB. If ready commit (update stats)
+  // todo: Deallocate entry from ROB
+  // todo: Update RAT after checking if the mapping is still valid
 
   // DUMMY CODE (for compiling, and ensuring simulation terminates!)
   for(ii=0; ii<PIPE_WIDTH; ii++){
