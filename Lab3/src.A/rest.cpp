@@ -5,9 +5,10 @@
 
 extern int32_t NUM_REST_ENTRIES;
 
-static int count = 0;
-static int rd = 0;
-static int wr = 0;
+// do we really need separate vars for rat, rt, rob
+static int rest_count = 0;
+// static int rd = 0;
+// static int wr = 0;
 
 /////////////////////////////////////////////////////////////
 // Init function initializes the Reservation Station
@@ -52,8 +53,12 @@ void REST_print_state(REST *t){
 /////////////////////////////////////////////////////////////
 
 bool  REST_check_space(REST *t){
-  // return count < MAX_REST_ENTRIES;
 
+  // we are double doing this
+  // need to compile separately.
+  return rest_count < MAX_REST_ENTRIES;
+
+/*
   int i;
   for(i=0; i<MAX_REST_ENTRIES; i++) {
     if (t->REST_Entries[i].valid) {
@@ -61,6 +66,8 @@ bool  REST_check_space(REST *t){
     }
   }
   return false;
+*/
+
 }
 
 /////////////////////////////////////////////////////////////
@@ -70,19 +77,13 @@ bool  REST_check_space(REST *t){
 void  REST_insert(REST *t, Inst_Info inst){
   assert( REST_check_space(t) );
 
-  // t->REST_Entries[wr] = inst;
-  // wr = wr+1 == MAX_REST_ENTRIES ? 0 : wr+1;
+  // putting in assertions to maintain invariants.
+  assert( !t->REST_Entries[inst.dr_tag].scheduled );
+  assert( !t->REST_Entries[inst.dr_tag].valid );
 
-  int i;
-  for(i=0; i<MAX_REST_ENTRIES; i++) {
-    if ( !t->REST_Entries[i].valid ) {
-      // putting in assertions to maintain invariants.
-      assert( !t->REST_Entries[i].scheduled );
-
-      t->REST_Entries[i].inst = inst;
-      t->REST_Entries[i].valid = true;
-    }
-  }
+  t->REST_Entries[inst.dr_tag].inst = inst;
+  t->REST_Entries[inst.dr_tag].valid = true;
+  rest_count++;
 }
 
 /////////////////////////////////////////////////////////////
@@ -90,17 +91,11 @@ void  REST_insert(REST *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void  REST_remove(REST *t, Inst_Info inst){
-  int i;
-  for(i=0; i<MAX_REST_ENTRIES; i++) {
-    if(t->REST_Entries[i].inst == inst) {
-      // assert it is valid before removing
-      assert( t->REST_Entries[i].valid );
-      t->REST_Entries[i].valid = false;
-      t->REST_Entries[i].scheduled = false;
-    }
-  }
-  // assert that we did actually find this instruction
-  assert(0);
+  // assert it is valid before removing
+  assert( t->REST_Entries[inst.dr_tag].valid );
+  t->REST_Entries[inst.dr_tag].valid = false;
+  t->REST_Entries[inst.dr_tag].scheduled = false;
+  rest_count--;
 }
 
 /////////////////////////////////////////////////////////////
@@ -126,16 +121,9 @@ void  REST_wakeup(REST *t, int tag){
 /////////////////////////////////////////////////////////////
 
 void  REST_schedule(REST *t, Inst_Info inst){
-  int i;
-  for(i=0; i<MAX_REST_ENTRIES; i++) {
-    if(t->REST_Entries[i].inst == inst) {
-      // assert it is valid before removing
-      assert( t->REST_Entries[i].valid );
-      t->REST_Entries[i].scheduled = true;
-    }
-  }
-  // assert that we did actually find this instruction
-  assert(0);
+  assert( t->REST_Entries[inst.dr_tag].valid );
+  assert( !t->REST_Entries[inst.dr_tag].scheduled );
+  t->REST_Entries[inst.dr_tag].scheduled = true;
 }
 
 

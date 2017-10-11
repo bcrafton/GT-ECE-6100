@@ -3,6 +3,9 @@
 
 #include "rat.h"
 
+// static int rd = 0; 
+// static int wr = 0;
+// static int count = 0;
 
 /////////////////////////////////////////////////////////////
 // Init function initializes the RAT
