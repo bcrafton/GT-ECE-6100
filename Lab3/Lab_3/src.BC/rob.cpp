@@ -59,7 +59,7 @@ bool ROB_check_space(ROB *t){
 /////////////////////////////////////////////////////////////
 
 int ROB_insert(ROB *t, Inst_Info inst){
-  assert( inst.dr_tag == -1);
+  // assert( inst.dr_tag == -1);
   assert( ROB_check_space(t) );
   assert( !t->ROB_Entries[t->tail_ptr].valid );
   assert( !t->ROB_Entries[t->tail_ptr].ready );

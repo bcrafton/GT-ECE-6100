@@ -75,12 +75,20 @@ bool  REST_check_space(REST *t){
 /////////////////////////////////////////////////////////////
 
 void  REST_insert(REST *t, Inst_Info inst){
+
+  REST_print_state(t);
+
   assert( REST_check_space(t) );
 
   // putting in assertions to maintain invariants.
   assert( inst.dr_tag != -1);
   assert( !t->REST_Entries[inst.dr_tag].scheduled );
-  assert( !t->REST_Entries[inst.dr_tag].valid );
+  
+  if (t->REST_Entries[inst.dr_tag].valid) {
+    // int i; for(i=0;i<NUM_REST_ENTRIES;i++){printf("tag: %d valid %d\n", i, t->REST_Entries[i].valid);}
+    fprintf(stderr, "tag: %d valid %d\n", inst.dr_tag, t->REST_Entries[inst.dr_tag].valid);
+    assert( !t->REST_Entries[inst.dr_tag].valid );
+  }
 
   t->REST_Entries[inst.dr_tag].inst = inst;
   t->REST_Entries[inst.dr_tag].valid = true;

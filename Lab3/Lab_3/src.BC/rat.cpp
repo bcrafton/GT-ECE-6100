@@ -43,8 +43,13 @@ void RAT_print_state(RAT *t){
 /////////////////////////////////////////////////////////////
 
 int  RAT_get_remap(RAT *t, int arf_id){
-  assert(t->RAT_Entries[arf_id].valid);
-  return t->RAT_Entries[arf_id].prf_id;
+  // assert(t->RAT_Entries[arf_id].valid);
+  if (t->RAT_Entries[arf_id].valid) {
+    return t->RAT_Entries[arf_id].prf_id;
+  }
+  else {
+    return -1;
+  }
 }
 
 /////////////////////////////////////////////////////////////

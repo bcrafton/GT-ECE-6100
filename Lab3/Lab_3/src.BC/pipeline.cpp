@@ -160,6 +160,9 @@ void pipe_print_state(Pipeline *p){
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
+    printf("Cycle #%lu\n", p->stat_num_cycle);
+
+    // pipe_print_state(p);
 
     pipe_cycle_commit(p);
     pipe_cycle_broadcast(p);
@@ -168,7 +171,6 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_rename(p);
     pipe_cycle_decode(p);
     pipe_cycle_fetch(p);
-
 }
 
 //--------------------------------------------------------------------//
@@ -272,35 +274,56 @@ void pipe_cycle_exe(Pipeline *p){
  **********************************************************************/
 
 void pipe_cycle_rename(Pipeline *p){
-
-  
   int i;
-  for(i=0; i<MAX_PIPE_WIDTH; i++) {
+  for(i=0; i<PIPE_WIDTH; i++) {
 
+    // get the instruction from id latch.
+    // probably need to check for stalling 
+    // this is really just if we are full or not.
     Inst_Info id_inst = p->ID_latch[i].inst;
 
     // todo: If src1/src2 is remapped set src1tag, src2tag
     // check RAT
     // where do we do this operatrion? REST?
+    if ( id_inst.src1_reg != 1 && RAT_get_remap( p->pipe_RAT, id_inst.src1_reg ) != -1 ) {
+      id_inst.src1_tag = RAT_get_remap( p->pipe_RAT, id_inst.src1_reg );
+    }
+    else {
+      id_inst.src1_tag = -1;
+    }
+    if ( id_inst.src2_reg != 1 && RAT_get_remap( p->pipe_RAT, id_inst.src2_reg ) != -1 ) {
+      id_inst.src2_tag = RAT_get_remap( p->pipe_RAT, id_inst.src2_reg );
+    }
+    else {
+      id_inst.src2_tag = -1;
+    }
+
+    // doing these 3 out of order
+    // todo: If src1/src2 is not remapped marked as src ready
+    // todo: If src1/src2 remapped and the ROB (tag) is ready then mark src ready
+    // fixme: If there is stall, we should not do rename and ROB alloc twice
+    // doing these 3 out of order
+
+    if(id_inst.src1_tag == -1 || ROB_check_ready(p->pipe_ROB, id_inst.src1_tag) ) {
+      id_inst.src1_ready = true;
+    }
+    if(id_inst.src2_tag == -1 || ROB_check_ready(p->pipe_ROB, id_inst.src2_tag) ) {
+      id_inst.src2_ready = true;
+    }
+
+    // these should be equal
+    assert( ROB_check_space( p->pipe_ROB ) == REST_check_space( p->pipe_REST ) );
 
     // todo: Find space in ROB and set drtag as such if successful
-    if ( ROB_check_space( p->pipe_ROB ) )
-    {
-      ROB_insert( p->pipe_ROB, id_inst );
+    if ( ROB_check_space( p->pipe_ROB ) ) {
+      int tag = ROB_insert( p->pipe_ROB, id_inst );
+      id_inst.dr_tag = tag;
     }
 
     // todo: Find space in REST and transfer this inst (valid=1, sched=0)
-    if ( REST_check_space( p->pipe_REST ) )
-    {
+    if ( REST_check_space( p->pipe_REST ) ) {
       REST_insert( p->pipe_REST, id_inst );
     }
-
-    // todo: If src1/src2 is not remapped marked as src ready
-    // check the RAT
-
-    // todo: If src1/src2 remapped and the ROB (tag) is ready then mark src ready
-
-    // fixme: If there is stall, we should not do rename and ROB alloc twice
   }
 }
 
@@ -348,14 +371,17 @@ void pipe_cycle_commit(Pipeline *p) {
 
   // DUMMY CODE (for compiling, and ensuring simulation terminates!)
   for(ii=0; ii<PIPE_WIDTH; ii++){
+
     if(p->FE_latch[ii].valid){
       if(p->FE_latch[ii].inst.inst_num >= p->halt_inst_num){
         p->halt=true;
-      }else{
-	p->stat_retired_inst++;
-	p->FE_latch[ii].valid=false;
+      }
+      else{
+        p->stat_retired_inst++;
+        p->FE_latch[ii].valid=false;
       }
     }
+
   }
 }
   
