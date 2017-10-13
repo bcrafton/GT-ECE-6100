@@ -329,9 +329,55 @@ void pipe_cycle_rename(Pipeline *p){
 
 //--------------------------------------------------------------------//
 
+extern int32_t NUM_REST_ENTRIES;
+
+typedef struct oldest {
+  Inst_Info inst;
+  bool valid;
+} oldest_t;
+
+oldest_t oldest(REST* t)
+{
+  oldest_t o;
+  o.valid = false;
+
+  int i;
+  for(i=0; i<NUM_REST_ENTRIES; i++)
+  {
+    if( o.valid == false && 
+        t->REST_Entries[i].valid && 
+        !t->REST_Entries[i].scheduled )
+    {
+      o.valid = true; 
+      o.inst = t->REST_Entries[i].inst;
+    }
+    else if( t->REST_Entries[i].valid && 
+             !t->REST_Entries[i].scheduled &&  
+             (o.inst.inst_num > t->REST_Entries[i].inst.inst_num) )
+    {
+      o.inst = t->REST_Entries[i].inst;
+    }
+  }
+
+  return o; 
+}
+
 void pipe_cycle_schedule(Pipeline *p){
 
   // todo: Implement two scheduling policies (SCHED_POLICY: 0 and 1)
+
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++){
+    oldest_t o = oldest(p->pipe_REST);
+    if (o.valid) {
+      int tag = o.inst.dr_tag;
+      p->pipe_REST->REST_Entries[tag].scheduled = true;
+
+      p->SC_latch[i].inst = p->pipe_REST->REST_Entries[tag].inst;
+      p->SC_latch[i].valid = true;
+      p->SC_latch[i].stall = false;
+    }
+  }
 
   if(SCHED_POLICY==0){
     // inorder scheduling
