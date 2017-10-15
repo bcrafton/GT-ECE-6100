@@ -114,10 +114,15 @@ bool ROB_check_head(ROB *t){
 Inst_Info ROB_remove_head(ROB *t){
   assert( t->ROB_Entries[t->head_ptr].valid );
 
+  // printf("removed\n");
+
   rob_count --;
 
   Inst_Info head = t->ROB_Entries[t->head_ptr].inst;
-  t->head_ptr = t->head_ptr+1 == NUM_ROB_ENTRIES ? 0 : t->head_ptr+1;
+  t->ROB_Entries[t->head_ptr].valid = false;
+  t->ROB_Entries[t->head_ptr].ready = false;
+
+  t->head_ptr = ((t->head_ptr+1) == NUM_ROB_ENTRIES) ? 0 : (t->head_ptr+1);
   return head;
 }
 

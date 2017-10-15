@@ -76,8 +76,6 @@ bool  REST_check_space(REST *t){
 
 void  REST_insert(REST *t, Inst_Info inst){
 
-  REST_print_state(t);
-
   assert( REST_check_space(t) );
 
   // putting in assertions to maintain invariants.

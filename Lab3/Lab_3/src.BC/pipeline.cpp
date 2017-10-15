@@ -19,6 +19,7 @@ extern int32_t LOAD_EXE_CYCLES;
  **********************************************************************/
 
 void pipe_fetch_inst(Pipeline *p, Pipe_Latch* fe_latch){
+
     static int halt_fetch = 0;
     uint8_t bytes_read = 0;
     Trace_Rec trace;
@@ -44,6 +45,7 @@ void pipe_fetch_inst(Pipeline *p, Pipe_Latch* fe_latch){
       fe_latch->stall=false;
       p->inst_num_tracker++;
       fetch_inst->inst_num=p->inst_num_tracker;
+      // printf("%lu\n", fe_latch[0].inst.inst_num);
       fetch_inst->op_type=trace.op_type;
 
       fetch_inst->dest_reg=trace.dest_needed? trace.dest:-1;
@@ -160,10 +162,8 @@ void pipe_print_state(Pipeline *p){
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
-    printf("Cycle #%lu\n", p->stat_num_cycle);
-
-    // pipe_print_state(p);
-
+    // printf("cycle #%lu\n", p->stat_num_cycle);
+  
     pipe_cycle_commit(p);
     pipe_cycle_broadcast(p);
     pipe_cycle_exe(p);
@@ -194,36 +194,45 @@ void pipe_cycle_fetch(Pipeline *p){
 //--------------------------------------------------------------------//
 
 void pipe_cycle_decode(Pipeline *p){
-   int ii = 0;
+  int ii = 0;
 
-   int jj = 0;
+  int jj = 0;
 
-   static uint64_t start_inst_id = 1;
+  static uint64_t start_inst_id = 1;
 
-   // Loop Over ID Latch
-   for(ii=0; ii<PIPE_WIDTH; ii++){ 
-     if((p->ID_latch[ii].stall == 1) || (p->ID_latch[ii].valid)) { // Stall
-       continue;  
-     } else {  // No Stall & there is Space in Latch
-       for(jj = 0; jj < PIPE_WIDTH; jj++) { // Loop Over FE Latch
-	 if(p->FE_latch[jj].valid) {
-	   if(p->FE_latch[jj].inst.inst_num == start_inst_id) { // In Order Inst Found
-	     p->ID_latch[ii]        = p->FE_latch[jj];
-	     p->ID_latch[ii].valid  = true;
-	     p->FE_latch[jj].valid  = false;
-	     start_inst_id++;
-	     break;
-	   }
-	 }
-       }
-     }
-   }
-   
+  // Loop Over ID Latch
+  for(ii=0; ii<PIPE_WIDTH; ii++)
+  { 
+    if((p->ID_latch[ii].stall == 1) || (p->ID_latch[ii].valid)) // Stall
+    { 
+      continue;  
+    } 
+    else // No Stall & there is Space in Latch
+    {  
+      for(jj = 0; jj < PIPE_WIDTH; jj++) // Loop Over FE Latch
+      { 
+        if(p->FE_latch[jj].valid) 
+        {
+          if(p->FE_latch[jj].inst.inst_num == start_inst_id) // In Order Inst Found
+          { 
+            p->ID_latch[ii]        = p->FE_latch[jj];
+            p->ID_latch[ii].valid  = true;
+            p->FE_latch[jj].valid  = false;
+            start_inst_id++;
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
 //--------------------------------------------------------------------//
 
 void pipe_cycle_exe(Pipeline *p){
+
+  // printf("%lu\n", p->SC_latch[0].inst.inst_num);
+  // printf("%lu\n", p->EX_latch[0].inst.inst_num);
 
   int ii;
   //If all operations are single cycle, simply copy SC latches to EX latches
@@ -233,6 +242,8 @@ void pipe_cycle_exe(Pipeline *p){
         p->EX_latch[ii]=p->SC_latch[ii];
         p->EX_latch[ii].valid = true;
         p->SC_latch[ii].valid = false; 
+        // printf("%lu\n", p->SC_latch[0].inst.inst_num);
+        // printf("%lu\n", p->EX_latch[0].inst.inst_num);
       }
       return;
     }
@@ -314,6 +325,8 @@ void pipe_cycle_rename(Pipeline *p){
     // these should be equal
     assert( ROB_check_space( p->pipe_ROB ) == REST_check_space( p->pipe_REST ) );
 
+    p->ID_latch[i].valid = false;
+
     // todo: Find space in ROB and set drtag as such if successful
     if ( ROB_check_space( p->pipe_ROB ) ) {
       int tag = ROB_insert( p->pipe_ROB, id_inst );
@@ -376,6 +389,7 @@ void pipe_cycle_schedule(Pipeline *p){
       p->SC_latch[i].inst = p->pipe_REST->REST_Entries[tag].inst;
       p->SC_latch[i].valid = true;
       p->SC_latch[i].stall = false;
+      // printf("%d\n", p->SC_latch[i].inst.inst_num);
     }
   }
 
@@ -402,6 +416,19 @@ void pipe_cycle_broadcast(Pipeline *p){
   // todo: Remove entry from REST (using inst_num)
   // todo: Update the ROB, mark ready, and update Inst Info in ROB
  
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++) {
+    if (p->EX_latch[i].valid) {
+
+      Inst_Info ex_inst = p->EX_latch[i].inst;
+      REST_wakeup(p->pipe_REST, ex_inst.dr_tag);
+      ROB_mark_ready(p->pipe_ROB, ex_inst);
+
+      p->EX_latch[i].valid = false;
+      p->EX_latch[i].stall = false;
+    }
+  }
+
 }
 
 
@@ -419,12 +446,21 @@ void pipe_cycle_commit(Pipeline *p) {
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
     if(p->FE_latch[ii].valid){
+      // printf("%d\n", p->FE_latch[ii].inst.inst_num);
       if(p->FE_latch[ii].inst.inst_num >= p->halt_inst_num){
         p->halt=true;
       }
       else{
-        p->stat_retired_inst++;
-        p->FE_latch[ii].valid=false;
+        // p->FE_latch[ii].valid=false;
+        if ( ROB_check_head(p->pipe_ROB) ) {
+          // printf("ready\n");
+          p->stat_retired_inst++;
+          Inst_Info commit_inst = ROB_remove_head(p->pipe_ROB);
+          REST_remove(p->pipe_REST, commit_inst);
+        }
+        else {
+          // printf("not ready - %lu\n", p->pipe_ROB->ROB_Entries[p->pipe_ROB->head_ptr].inst.inst_num);
+        }
       }
     }
 
