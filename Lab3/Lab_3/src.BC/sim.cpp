@@ -43,7 +43,7 @@ void print_stats(void);
 int32_t  PIPE_WIDTH=1;
 int32_t   NUM_REST_ENTRIES=32;
 int32_t   NUM_ROB_ENTRIES=32;
-int32_t   LOAD_EXE_CYCLES=1;
+int32_t   LOAD_EXE_CYCLES=4;
 int32_t   SCHED_POLICY=1;
 
 Pipeline *pipeline;

@@ -57,6 +57,7 @@ int  RAT_get_remap(RAT *t, int arf_id){
 /////////////////////////////////////////////////////////////
 
 void RAT_set_remap(RAT *t, int arf_id, int prf_id){
+  // printf("remapped %d to %d\n", arf_id, prf_id);
   t->RAT_Entries[arf_id].prf_id = prf_id;
   t->RAT_Entries[arf_id].valid = true;
 }

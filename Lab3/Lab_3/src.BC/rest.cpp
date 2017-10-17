@@ -56,7 +56,7 @@ bool  REST_check_space(REST *t){
 
   // we are double doing this
   // need to compile separately.
-  return rest_count < MAX_REST_ENTRIES;
+  return rest_count < NUM_REST_ENTRIES;
 
 /*
   int i;
@@ -110,15 +110,16 @@ void  REST_remove(REST *t, Inst_Info inst){
 // For broadcast of freshly ready tags, wakeup waiting inst
 /////////////////////////////////////////////////////////////
 
-void  REST_wakeup(REST *t, int tag){
+void REST_wakeup(REST *t, int tag){
   int i;
+  // printf("broadcasting %d\n", tag);
   for(i=0; i<MAX_REST_ENTRIES; i++) {
     if(t->REST_Entries[i].valid) {
-      if (t->REST_Entries[i].inst.src1_tag != -1 && t->REST_Entries[i].inst.src1_tag == tag) {
-        t->REST_Entries[i].inst.src1_tag = -1;
+      if (t->REST_Entries[i].inst.src1_tag == tag) {
+        t->REST_Entries[i].inst.src1_ready = true;
       }
-      if (t->REST_Entries[i].inst.src2_tag != -1 && t->REST_Entries[i].inst.src2_tag == tag) {
-        t->REST_Entries[i].inst.src2_tag = -1;
+      if (t->REST_Entries[i].inst.src2_tag == tag) {
+        t->REST_Entries[i].inst.src2_ready = true;
       }
     }
   }
@@ -128,7 +129,7 @@ void  REST_wakeup(REST *t, int tag){
 // When an instruction gets scheduled, mark REST entry as such
 /////////////////////////////////////////////////////////////
 
-void  REST_schedule(REST *t, Inst_Info inst){
+void REST_schedule(REST *t, Inst_Info inst){
   assert( inst.dr_tag != -1);
   assert( t->REST_Entries[inst.dr_tag].valid );
   assert( !t->REST_Entries[inst.dr_tag].scheduled );

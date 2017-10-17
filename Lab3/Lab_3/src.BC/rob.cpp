@@ -31,7 +31,7 @@ void ROB_print_state(ROB *t){
  int ii = 0;
   printf("Printing ROB \n");
   printf("Entry  Inst   Valid   ready\n");
-  for(ii = 0; ii < 7; ii++) {
+  for(ii = 0; ii < NUM_ROB_ENTRIES; ii++) {
     printf("%5d ::  %d\t", ii, (int)t->ROB_Entries[ii].inst.inst_num);
     printf(" %5d\t", t->ROB_Entries[ii].valid);
     printf(" %5d\n", t->ROB_Entries[ii].ready);
@@ -51,7 +51,7 @@ void ROB_print_state(ROB *t){
 bool ROB_check_space(ROB *t){
   // just going to maintain this var for now.
   // cant think of a better way to do this when they are all in same file
-  return rob_count < MAX_ROB_ENTRIES;
+  return rob_count < NUM_ROB_ENTRIES;
 }
 
 /////////////////////////////////////////////////////////////
@@ -93,7 +93,14 @@ void ROB_mark_ready(ROB *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 bool ROB_check_ready(ROB *t, int tag){
-  assert( t->ROB_Entries[tag].valid );
+  if ( ! t->ROB_Entries[tag].valid ) {
+    fprintf(stderr, "tag not valid: %d\n", tag);
+    assert( t->ROB_Entries[tag].valid );
+  }
+  // if we are asking if something is ready and its not even valid ... what are we doing?
+  // probably not broadcasing properly.
+  // lets keep the assumption that any time we check ready it should be valid
+
   return t->ROB_Entries[tag].ready;
 }
 
@@ -103,7 +110,13 @@ bool ROB_check_ready(ROB *t, int tag){
 /////////////////////////////////////////////////////////////
 
 bool ROB_check_head(ROB *t){
-  assert( t->ROB_Entries[t->head_ptr].valid );
+  // assert( t->ROB_Entries[t->head_ptr].valid );
+  // the head can be invalid. but that would mean we have nothing in ROB
+  if ( !t->ROB_Entries[t->head_ptr].valid ) {
+    assert( rob_count == 0);
+    return false;
+  }
+
   return ROB_check_ready( t, t->head_ptr ); 
 }
 
