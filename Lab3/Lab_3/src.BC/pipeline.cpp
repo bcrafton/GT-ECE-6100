@@ -395,33 +395,36 @@ oldest_t oldest(REST* t)
       o.inst = t->REST_Entries[i].inst;
     }
   }
+  return o; 
+}
 
-/*
+oldest_t oldest_and_ready(REST* t)
+{
+  oldest_t o;
+  o.valid = false;
+
   int i;
   for(i=0; i<NUM_REST_ENTRIES; i++)
   {
-    if( o.valid == false && 
+    if (o.valid == false && 
         t->REST_Entries[i].valid && 
         !t->REST_Entries[i].scheduled &&
         t->REST_Entries[i].inst.src1_ready &&
-        t->REST_Entries[i].inst.src2_ready )
-    {
-      o.valid = true; 
+        t->REST_Entries[i].inst.src2_ready) {
+
+      o.valid = true;
       o.inst = t->REST_Entries[i].inst;
     }
-    else if( o.valid == true && 
-             t->REST_Entries[i].valid && 
-             !t->REST_Entries[i].scheduled &&  
-             (o.inst.inst_num > t->REST_Entries[i].inst.inst_num) &&
+    else if (t->REST_Entries[i].valid && 
+             (o.inst.inst_num > t->REST_Entries[i].inst.inst_num) && 
+             !t->REST_Entries[i].scheduled &&
              t->REST_Entries[i].inst.src1_ready &&
-             t->REST_Entries[i].inst.src2_ready )
-    {
+             t->REST_Entries[i].inst.src2_ready) {
+
       o.inst = t->REST_Entries[i].inst;
     }
   }
-*/
-
-  return o; 
+  return o;
 }
 
 void pipe_cycle_schedule(Pipeline *p){
@@ -469,11 +472,25 @@ void pipe_cycle_schedule(Pipeline *p){
 */
 
   if(SCHED_POLICY==1){
-    assert(0);
-    // out of order scheduling
-    // Find valid/unscheduled/src1ready/src2ready entries in REST
-    // Transfer them to SC_latch and mark that REST entry as scheduled
+    int i;
+    for(i=0; i<PIPE_WIDTH; i++){
+      oldest_t o = oldest_and_ready(p->pipe_REST);
+
+      if (o.valid) {
+        int tag = o.inst.dr_tag;
+
+        // this check unnecessary I believe.
+        if (p->pipe_REST->REST_Entries[tag].inst.src1_ready && p->pipe_REST->REST_Entries[tag].inst.src2_ready ) {
+          p->pipe_REST->REST_Entries[tag].scheduled = true;
+
+          p->SC_latch[i].inst = p->pipe_REST->REST_Entries[tag].inst;
+          p->SC_latch[i].valid = true;
+          p->SC_latch[i].stall = false;
+        }
+      }
+    }
   }
+
 }
 
 
@@ -514,7 +531,7 @@ void pipe_cycle_commit(Pipeline *p) {
   // todo: Deallocate entry from ROB
   // todo: Update RAT after checking if the mapping is still valid
 
-  for(ii=0; ii<MAX_BROADCASTS; ii++){
+  for(ii=0; ii<PIPE_WIDTH; ii++){
 
     if(p->FE_latch[ii].valid){
 
