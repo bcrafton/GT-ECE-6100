@@ -11,7 +11,7 @@
 
 #include "pipeline.h"
 
-#define HEARTBEAT_CYCLES 10
+#define HEARTBEAT_CYCLES 10000
 
 
 /*********************************************************************

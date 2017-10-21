@@ -174,7 +174,7 @@ void pipe_cycle(Pipeline *p)
     // printf("inst #%lu\n", p->stat_retired_inst);
 
     //ROB_print_state(p->pipe_ROB);
-    REST_print_state(p->pipe_REST);
+    //REST_print_state(p->pipe_REST);
     //EXEQ_print_state(p->pipe_EXEQ);
 }
 
@@ -378,7 +378,7 @@ void pipe_cycle_rename(Pipeline *p){
     // we never stall, we just overwrite ?
 
     // we mark it false if we can place it in the REST
-    p->ID_latch[i].valid = false;
+    p->ID_latch[min].valid = false;
 
     // todo: Find space in ROB and set drtag as such if successful
     if ( ROB_check_space( p->pipe_ROB ) ) {
