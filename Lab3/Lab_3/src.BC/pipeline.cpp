@@ -170,8 +170,12 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_decode(p);
     pipe_cycle_fetch(p);
 
-    // ROB_print_state(p->pipe_ROB);
-    // REST_print_state(p->pipe_REST);
+    // printf("cycle #%lu\n", p->stat_num_cycle);
+    // printf("inst #%lu\n", p->stat_retired_inst);
+
+    //ROB_print_state(p->pipe_ROB);
+    REST_print_state(p->pipe_REST);
+    //EXEQ_print_state(p->pipe_EXEQ);
 }
 
 //--------------------------------------------------------------------//
@@ -247,7 +251,7 @@ void pipe_cycle_exe(Pipeline *p){
         // printf("%lu\n", p->EX_latch[0].inst.inst_num);
       }
       // supposedly this isnt supposed to be here.
-      return;
+      // return;
     }
   }
   
@@ -286,6 +290,25 @@ void pipe_cycle_exe(Pipeline *p){
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
 
+uint32_t oldest_id(Pipeline *p)
+{
+  int min = -1;
+
+  int i;
+  for(i=0; i<PIPE_WIDTH; i++) {
+    if ((min == -1) && p->ID_latch[i].valid) {
+      min = i;
+    }
+    else if ((p->ID_latch[i].inst.inst_num < p->ID_latch[min].inst.inst_num) && p->ID_latch[i].valid) {
+      min = i;
+    }
+  }
+
+    // printf("inst number %d %d %d %d %d\n", min, p->ID_latch[0].inst.inst_num, p->ID_latch[0].valid, p->ID_latch[1].inst.inst_num, p->ID_latch[1].valid);
+
+  return min;
+}
+
 void pipe_cycle_rename(Pipeline *p){
   int i;
   for(i=0; i<PIPE_WIDTH; i++) {
@@ -296,76 +319,81 @@ void pipe_cycle_rename(Pipeline *p){
     // get the instruction from id latch.
     // probably need to check for stalling 
     // this is really just if we are full or not.
-    if ( p->ID_latch[i].valid && ROB_check_space( p->pipe_ROB ) ) {
-      Inst_Info id_inst = p->ID_latch[i].inst;
+
+    // problem is that we can take only A. Then B is youngest. C comes in at top pipe and is treated as older.
+    int min = oldest_id(p);
+    if ( !( (min >= 0) && p->ID_latch[min].valid && ROB_check_space(p->pipe_ROB) ) ) { return; }
+    
+    // this was never set to min...
+    // it was left as "i"
+    Inst_Info id_inst = p->ID_latch[min].inst;
 
 /*
-      printf("cycle #%lu\n", p->stat_num_cycle);
-      printf("inst #%lu\n", p->stat_retired_inst);
-      printf("%lu %d %d %d %d %d %d\n", 
-        id_inst.inst_num, 
-        id_inst.src1_reg, 
-        id_inst.src2_reg, 
-        id_inst.src1_tag, 
-        id_inst.src2_tag, 
-        id_inst.src1_ready, 
-        id_inst.src2_ready
-      );
+    printf("cycle #%lu\n", p->stat_num_cycle);
+    printf("inst #%lu\n", p->stat_retired_inst);
+    printf("%lu %d %d %d %d %d %d\n", 
+      id_inst.inst_num, 
+      id_inst.src1_reg, 
+      id_inst.src2_reg, 
+      id_inst.src1_tag, 
+      id_inst.src2_tag, 
+      id_inst.src1_ready, 
+      id_inst.src2_ready
+    );
 */
 
-      // todo: If src1/src2 is remapped set src1tag, src2tag
-      // check RAT
-      // where do we do this operatrion? REST?
+    // todo: If src1/src2 is remapped set src1tag, src2tag
+    // check RAT
+    // where do we do this operatrion? REST?
 
-      if ( (id_inst.src1_reg != -1) && (RAT_get_remap( p->pipe_RAT, id_inst.src1_reg ) != -1) ) {
-        id_inst.src1_tag = RAT_get_remap( p->pipe_RAT, id_inst.src1_reg );
-        // printf("remapped to %d\n", RAT_get_remap( p->pipe_RAT, id_inst.src1_reg ));
-      }
-      else {
-        id_inst.src1_tag = -1;
-      }
-      if ( (id_inst.src2_reg != -1) && (RAT_get_remap( p->pipe_RAT, id_inst.src2_reg ) != -1) ) {
-        id_inst.src2_tag = RAT_get_remap( p->pipe_RAT, id_inst.src2_reg );
-        // printf("remapped to %d\n", RAT_get_remap( p->pipe_RAT, id_inst.src2_reg ));
-      }
-      else {
-        id_inst.src2_tag = -1;
-      }
+    if ( (id_inst.src1_reg != -1) && (RAT_get_remap( p->pipe_RAT, id_inst.src1_reg ) != -1) ) {
+      id_inst.src1_tag = RAT_get_remap( p->pipe_RAT, id_inst.src1_reg );
+      // printf("remapped to %d\n", RAT_get_remap( p->pipe_RAT, id_inst.src1_reg ));
+    }
+    else {
+      id_inst.src1_tag = -1;
+    }
+    if ( (id_inst.src2_reg != -1) && (RAT_get_remap( p->pipe_RAT, id_inst.src2_reg ) != -1) ) {
+      id_inst.src2_tag = RAT_get_remap( p->pipe_RAT, id_inst.src2_reg );
+      // printf("remapped to %d\n", RAT_get_remap( p->pipe_RAT, id_inst.src2_reg ));
+    }
+    else {
+      id_inst.src2_tag = -1;
+    }
 
-      // doing these 3 out of order
-      // todo: If src1/src2 is not remapped marked as src ready
-      // todo: If src1/src2 remapped and the ROB (tag) is ready then mark src ready
-      // fixme: If there is stall, we should not do rename and ROB alloc twice
-      // doing these 3 out of order
+    // doing these 3 out of order
+    // todo: If src1/src2 is not remapped marked as src ready
+    // todo: If src1/src2 remapped and the ROB (tag) is ready then mark src ready
+    // fixme: If there is stall, we should not do rename and ROB alloc twice
+    // doing these 3 out of order
 
-      if(id_inst.src1_tag == -1 || ROB_check_ready(p->pipe_ROB, id_inst.src1_tag) ) {
-        id_inst.src1_ready = true;
-      }
-      if(id_inst.src2_tag == -1 || ROB_check_ready(p->pipe_ROB, id_inst.src2_tag) ) {
-        id_inst.src2_ready = true;
-      }
+    if(id_inst.src1_tag == -1 || ROB_check_ready(p->pipe_ROB, id_inst.src1_tag) ) {
+      id_inst.src1_ready = true;
+    }
+    if(id_inst.src2_tag == -1 || ROB_check_ready(p->pipe_ROB, id_inst.src2_tag) ) {
+      id_inst.src2_ready = true;
+    }
 
-      // printf("%d %d\n", ROB_check_space( p->pipe_ROB ), REST_check_space( p->pipe_REST ));
-      // we never stall, we just overwrite ?
+    // printf("%d %d\n", ROB_check_space( p->pipe_ROB ), REST_check_space( p->pipe_REST ));
+    // we never stall, we just overwrite ?
 
-      // we mark it false if we can place it in the REST
-      p->ID_latch[i].valid = false;
+    // we mark it false if we can place it in the REST
+    p->ID_latch[i].valid = false;
 
-      // todo: Find space in ROB and set drtag as such if successful
-      if ( ROB_check_space( p->pipe_ROB ) ) {
-        int tag = ROB_insert( p->pipe_ROB, id_inst );
-        id_inst.dr_tag = tag;
-      }
+    // todo: Find space in ROB and set drtag as such if successful
+    if ( ROB_check_space( p->pipe_ROB ) ) {
+      int tag = ROB_insert( p->pipe_ROB, id_inst );
+      id_inst.dr_tag = tag;
+    }
 
-      // todo: Find space in REST and transfer this inst (valid=1, sched=0)
-      if ( REST_check_space( p->pipe_REST ) ) {
-        REST_insert( p->pipe_REST, id_inst );
-      }
+    // todo: Find space in REST and transfer this inst (valid=1, sched=0)
+    if ( REST_check_space( p->pipe_REST ) ) {
+      REST_insert( p->pipe_REST, id_inst );
+    }
 
-      // we place in the instruction in rest and change our rat
-      if (id_inst.dest_reg != -1) {
-        RAT_set_remap( p->pipe_RAT, id_inst.dest_reg, id_inst.dr_tag );
-      }
+    // we place in the instruction in rest and change our rat
+    if (id_inst.dest_reg != -1) {
+      RAT_set_remap( p->pipe_RAT, id_inst.dest_reg, id_inst.dr_tag );
     }
   }
 }
@@ -391,7 +419,7 @@ oldest_t oldest(REST* t)
       o.valid = true;
       o.inst = t->REST_Entries[i].inst;
     }
-    else if (t->REST_Entries[i].valid && (o.inst.inst_num > t->REST_Entries[i].inst.inst_num) && !t->REST_Entries[i].scheduled) {
+    else if (t->REST_Entries[i].valid && (t->REST_Entries[i].inst.inst_num < o.inst.inst_num) && !t->REST_Entries[i].scheduled) {
       o.inst = t->REST_Entries[i].inst;
     }
   }
@@ -439,13 +467,13 @@ void pipe_cycle_schedule(Pipeline *p){
     int i;
     for(i=0; i<PIPE_WIDTH; i++){
       oldest_t o = oldest(p->pipe_REST);
-
       if (o.valid) {
         int tag = o.inst.dr_tag;
-
         if (p->pipe_REST->REST_Entries[tag].inst.src1_ready && p->pipe_REST->REST_Entries[tag].inst.src2_ready ) {
           p->pipe_REST->REST_Entries[tag].scheduled = true;
-
+          
+          // stops at 18
+          // printf("%d %d\n", o.inst.inst_num, o.valid);
           p->SC_latch[i].inst = p->pipe_REST->REST_Entries[tag].inst;
           p->SC_latch[i].valid = true;
           p->SC_latch[i].stall = false;
@@ -479,7 +507,6 @@ void pipe_cycle_schedule(Pipeline *p){
       if (o.valid) {
         int tag = o.inst.dr_tag;
 
-        // this check unnecessary I believe.
         if (p->pipe_REST->REST_Entries[tag].inst.src1_ready && p->pipe_REST->REST_Entries[tag].inst.src2_ready ) {
           p->pipe_REST->REST_Entries[tag].scheduled = true;
 
@@ -506,7 +533,7 @@ void pipe_cycle_broadcast(Pipeline *p){
   int i;
   for(i=0; i<MAX_BROADCASTS; i++) { // changing this because exeq stage just MAX_BROADCASTS?
     if (p->EX_latch[i].valid) {
-
+      // printf("%d\n", p->EX_latch[i].inst.inst_num);
       Inst_Info ex_inst = p->EX_latch[i].inst;
       REST_wakeup(p->pipe_REST, ex_inst.dr_tag);
       ROB_mark_ready(p->pipe_ROB, ex_inst);
@@ -533,24 +560,15 @@ void pipe_cycle_commit(Pipeline *p) {
 
   for(ii=0; ii<PIPE_WIDTH; ii++){
 
-    if(p->FE_latch[ii].valid){
-
-      if(p->FE_latch[ii].inst.inst_num >= p->halt_inst_num){
-        p->halt=true;
-      }
-
-    }
-
     if ( ROB_check_head(p->pipe_ROB) ) {
-
-      // printf("cycle #%lu\n", p->stat_num_cycle);
-      // printf("inst #%lu\n", p->stat_retired_inst);
-
       p->stat_retired_inst++;
       Inst_Info commit_inst = ROB_remove_head(p->pipe_ROB);
       REST_remove(p->pipe_REST, commit_inst);
       if (p->pipe_RAT->RAT_Entries[commit_inst.dest_reg].prf_id == commit_inst.dr_tag) {
         RAT_reset_entry( p->pipe_RAT, commit_inst.dest_reg );
+      }
+      if(commit_inst.inst_num >= p->halt_inst_num){
+        p->halt=true;
       }
     }
 
