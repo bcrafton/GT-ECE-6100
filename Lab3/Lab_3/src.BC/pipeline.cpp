@@ -19,7 +19,6 @@ extern int32_t LOAD_EXE_CYCLES;
  **********************************************************************/
 
 void pipe_fetch_inst(Pipeline *p, Pipe_Latch* fe_latch){
-
     static int halt_fetch = 0;
     uint8_t bytes_read = 0;
     Trace_Rec trace;
@@ -161,7 +160,7 @@ void pipe_print_state(Pipeline *p){
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
-  
+
     pipe_cycle_commit(p);
     pipe_cycle_broadcast(p);
     pipe_cycle_exe(p);
@@ -170,12 +169,6 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_decode(p);
     pipe_cycle_fetch(p);
 
-    // printf("cycle #%lu\n", p->stat_num_cycle);
-    // printf("inst #%lu\n", p->stat_retired_inst);
-
-    //ROB_print_state(p->pipe_ROB);
-    //REST_print_state(p->pipe_REST);
-    //EXEQ_print_state(p->pipe_EXEQ);
 }
 
 //--------------------------------------------------------------------//
@@ -199,45 +192,36 @@ void pipe_cycle_fetch(Pipeline *p){
 //--------------------------------------------------------------------//
 
 void pipe_cycle_decode(Pipeline *p){
-  int ii = 0;
+   int ii = 0;
 
-  int jj = 0;
+   int jj = 0;
 
-  static uint64_t start_inst_id = 1;
+   static uint64_t start_inst_id = 1;
 
-  // Loop Over ID Latch
-  for(ii=0; ii<PIPE_WIDTH; ii++)
-  { 
-    if((p->ID_latch[ii].stall == 1) || (p->ID_latch[ii].valid)) // Stall
-    { 
-      continue;  
-    } 
-    else // No Stall & there is Space in Latch
-    {  
-      for(jj = 0; jj < PIPE_WIDTH; jj++) // Loop Over FE Latch
-      { 
-        if(p->FE_latch[jj].valid) 
-        {
-          if(p->FE_latch[jj].inst.inst_num == start_inst_id) // In Order Inst Found
-          { 
-            p->ID_latch[ii]        = p->FE_latch[jj];
-            p->ID_latch[ii].valid  = true;
-            p->FE_latch[jj].valid  = false;
-            start_inst_id++;
-            break;
-          }
-        }
-      }
-    }
-  }
+   // Loop Over ID Latch
+   for(ii=0; ii<PIPE_WIDTH; ii++){ 
+     if((p->ID_latch[ii].stall == 1) || (p->ID_latch[ii].valid)) { // Stall
+       continue;  
+     } else {  // No Stall & there is Space in Latch
+       for(jj = 0; jj < PIPE_WIDTH; jj++) { // Loop Over FE Latch
+	 if(p->FE_latch[jj].valid) {
+	   if(p->FE_latch[jj].inst.inst_num == start_inst_id) { // In Order Inst Found
+	     p->ID_latch[ii]        = p->FE_latch[jj];
+	     p->ID_latch[ii].valid  = true;
+	     p->FE_latch[jj].valid  = false;
+	     start_inst_id++;
+	     break;
+	   }
+	 }
+       }
+     }
+   }
+   
 }
 
 //--------------------------------------------------------------------//
 
 void pipe_cycle_exe(Pipeline *p){
-
-  // printf("%lu\n", p->SC_latch[0].inst.inst_num);
-  // printf("%lu\n", p->EX_latch[0].inst.inst_num);
 
   int ii;
   //If all operations are single cycle, simply copy SC latches to EX latches
@@ -247,12 +231,9 @@ void pipe_cycle_exe(Pipeline *p){
         p->EX_latch[ii]=p->SC_latch[ii];
         p->EX_latch[ii].valid = true;
         p->SC_latch[ii].valid = false; 
-        // printf("%lu\n", p->SC_latch[0].inst.inst_num);
-        // printf("%lu\n", p->EX_latch[0].inst.inst_num);
       }
-      // supposedly this isnt supposed to be here.
-      // return;
     }
+    return;
   }
   
   //---------Handling exe for multicycle operations is complex, and uses EXEQ
