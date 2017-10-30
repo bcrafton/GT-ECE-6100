@@ -66,6 +66,7 @@ void    cache_print_stats    (Cache *c, char *header){
 ////////////////////////////////////////////////////////////////////
 
 typedef unsigned int uint32_t;
+typedef unsigned long uint64_t;
 
 uint32_t log2_int(uint32_t num)
 {
@@ -122,18 +123,20 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // there exists line size and cache size / assoc globals in sim.cpp
 uint32_t find_lru(Cache *c, uint32_t index)
 {
-  int i;
   int lru = -1;
-  int 
+  uint64_t oldest;
+
+  int i;
   for(i=0; i<c->num_sets; i++)
   {
     if(!c->sets[i].line[index].valid)
     {
       return i;
     }
-    else if(lru == -1 || c->sets[i].line[index].last_access_time < lru)
+    else if(lru == -1 || c->sets[i].line[index].last_access_time < oldest)
     {
-      lru = c->sets[i].line[index].last_access_time;
+      lru = i;
+      oldest = c->sets[i].line[index].last_access_time;
     }
   }
   return lru;
