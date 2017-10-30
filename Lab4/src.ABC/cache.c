@@ -16,6 +16,7 @@ Cache  *cache_new(uns64 size, uns64 assoc, uns64 linesize, uns64 repl_policy){
    Cache *c = (Cache *) calloc (1, sizeof (Cache));
    c->num_ways = assoc;
    c->repl_policy = repl_policy;
+   c->linesize = linesize;
 
    if(c->num_ways > MAX_WAYS){
      printf("Change MAX_WAYS in cache.h to support %llu ways\n", c->num_ways);
@@ -65,12 +66,42 @@ void    cache_print_stats    (Cache *c, char *header){
 // Update appropriate stats
 ////////////////////////////////////////////////////////////////////
 
-Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
-  Flag outcome=MISS;
+typedef unsigned int uint32_t;
 
+uint32_t log2_int(uint32_t num)
+{
+  uint32_t bit;
+  for(bit = 31; bit > 0; bit--)
+  {
+    uint32_t mask = 1 << bit;
+    if((mask & num) > 0)
+    {
+      return bit;
+    }
+  }
+  // log2 of 0 = 0 ?
+  return 0;
+}
+
+Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
+
+  // get the log2 of the linesize, then we shift the addr over by that many and get the index
+  // then and with num_ways - 1, which should give us all the bits representing the index.
+  uint32_t index = (lineaddr >> log2_int(c->linesize)) & (c->num_ways-1);
+  uint32_t tag = (lineaddr >> (log2_int(c->linesize) + log2_int(c->num_ways)));
+
+  uint32_t i;
+  for(i=0; i<c->num_sets; i++)
+  {
+    // not sure whether tag is the address or just tag bits of address.
+    if(c->sets[i].line[index].valid && c->sets[i].line[index].tag == tag) // == lineaddr
+    {
+      return HIT;
+    }
+  }
   
-  return outcome;
+  return MISS;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -79,13 +110,60 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
 
+uint32_t find_lru(Cache *c, uint32_t index)
+{
+  int i;
+  int lru = -1;
+  for(i=0; i<c->num_sets; i++)
+  {
+    if(!c->sets[i].line[index].valid)
+    {
+      return i;
+    }
+    else if(lru == -1 || c->sets[i].line[index].last_access_time < lru)
+    {
+      lru = c->sets[i].line[index].last_access_time;
+    }
+  }
+  return lru;
+}
+
 void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 
+  // keep a count of all accesses as our last_access_time.
+  static int count = 0;
+  count++;
+
   // Your Code Goes Here
+  uint32_t index = (lineaddr >> log2_int(c->linesize)) & (c->num_ways-1);
+  uint32_t tag = (lineaddr >> (log2_int(c->linesize) + log2_int(c->num_ways)) );
+
   // Find victim using cache_find_victim
+  uint32_t lru = find_lru(c, index);
+/*
+  if (is_write) {
+    c->sets[i].line[index].valid = 1;
+    c->sets[i].line[index].dirty = 0;
+    c->sets[i].line[index].tag = tag;
+    c->sets[i].line[index].core_id = 0;
+    c->sets[i].line[index].last_access_time = count;
+  }
+  else {
+    c->sets[i].line[index].valid = 1;
+    c->sets[i].line[index].dirty = 0;
+    c->sets[i].line[index].tag = tag;
+    c->sets[i].line[index].core_id = 0;
+    c->sets[i].line[index].last_access_time = count;
+  }
+*/
+  c->sets[lru].line[index].valid = 1;
+  c->sets[lru].line[index].dirty = 0;
+  c->sets[lru].line[index].tag = tag;
+  c->sets[lru].line[index].core_id = 0;
+  c->sets[lru].line[index].last_access_time = count;
+
   // Initialize the evicted entry
   // Initialize the victime entry
- 
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -100,4 +178,18 @@ uns cache_find_victim(Cache *c, uns set_index, uns core_id){
   
   return victim;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
