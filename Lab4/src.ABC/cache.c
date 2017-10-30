@@ -4,7 +4,7 @@
 
 #include "cache.h"
 
-
+extern uns64 CACHE_LINESIZE; // adding this here because need line size.
 extern uns64 cycle; // You can use this as timestamp for LRU
 
 ////////////////////////////////////////////////////////////////////
@@ -16,7 +16,6 @@ Cache  *cache_new(uns64 size, uns64 assoc, uns64 linesize, uns64 repl_policy){
    Cache *c = (Cache *) calloc (1, sizeof (Cache));
    c->num_ways = assoc;
    c->repl_policy = repl_policy;
-   c->linesize = linesize;
 
    if(c->num_ways > MAX_WAYS){
      printf("Change MAX_WAYS in cache.h to support %llu ways\n", c->num_ways);
@@ -83,13 +82,16 @@ uint32_t log2_int(uint32_t num)
   return 0;
 }
 
+// there exists line size and cache size / assoc globals in sim.cpp
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
+  c->stat_write_access++;
+  c->stat_read_access++;
 
   // get the log2 of the linesize, then we shift the addr over by that many and get the index
   // then and with num_ways - 1, which should give us all the bits representing the index.
-  uint32_t index = (lineaddr >> log2_int(c->linesize)) & (c->num_ways-1);
-  uint32_t tag = (lineaddr >> (log2_int(c->linesize) + log2_int(c->num_ways)));
+  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_ways-1);
+  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_ways)));
 
   uint32_t i;
   for(i=0; i<c->num_sets; i++)
@@ -101,6 +103,13 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
     }
   }
   
+  if (is_write) {
+    c->stat_write_miss++;
+  }
+  else {
+    c->stat_read_miss++;
+  }
+
   return MISS;
 }
 
@@ -110,10 +119,12 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
 
+// there exists line size and cache size / assoc globals in sim.cpp
 uint32_t find_lru(Cache *c, uint32_t index)
 {
   int i;
   int lru = -1;
+  int 
   for(i=0; i<c->num_sets; i++)
   {
     if(!c->sets[i].line[index].valid)
@@ -128,42 +139,35 @@ uint32_t find_lru(Cache *c, uint32_t index)
   return lru;
 }
 
+// there exists line size and cache size / assoc globals in sim.cpp
 void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 
-  // keep a count of all accesses as our last_access_time.
-  static int count = 0;
-  count++;
-
   // Your Code Goes Here
-  uint32_t index = (lineaddr >> log2_int(c->linesize)) & (c->num_ways-1);
-  uint32_t tag = (lineaddr >> (log2_int(c->linesize) + log2_int(c->num_ways)) );
+
+  // 16-1 = 15 = 1111 which is the mask we want.
+  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_ways-1); 
+  assert(index < c->num_ways);
+
+  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_ways)) );
 
   // Find victim using cache_find_victim
   uint32_t lru = find_lru(c, index);
-/*
-  if (is_write) {
-    c->sets[i].line[index].valid = 1;
-    c->sets[i].line[index].dirty = 0;
-    c->sets[i].line[index].tag = tag;
-    c->sets[i].line[index].core_id = 0;
-    c->sets[i].line[index].last_access_time = count;
+  assert(lru < c->num_sets);
+
+  // we are evicting it, so check if it is dirty
+  if ( c->sets[lru].line[index].dirty ) {
+    c->stat_dirty_evicts++;
   }
-  else {
-    c->sets[i].line[index].valid = 1;
-    c->sets[i].line[index].dirty = 0;
-    c->sets[i].line[index].tag = tag;
-    c->sets[i].line[index].core_id = 0;
-    c->sets[i].line[index].last_access_time = count;
-  }
-*/
+
+  // Initialize the evicted entry
   c->sets[lru].line[index].valid = 1;
   c->sets[lru].line[index].dirty = 0;
   c->sets[lru].line[index].tag = tag;
   c->sets[lru].line[index].core_id = 0;
-  c->sets[lru].line[index].last_access_time = count;
+  c->sets[lru].line[index].last_access_time = cycle; // defined at top of file for this reason
 
-  // Initialize the evicted entry
   // Initialize the victime entry
+  // what do here?
 }
 
 ////////////////////////////////////////////////////////////////////

@@ -32,7 +32,6 @@ struct Cache{
   uns64 num_sets;
   uns64 num_ways;
   uns64 repl_policy;
-  uns64 linesize;
   
   Cache_Set *sets;
   Cache_Line last_evicted_line; // for checking writebacks
