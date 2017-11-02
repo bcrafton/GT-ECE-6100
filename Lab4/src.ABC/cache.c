@@ -86,13 +86,20 @@ uint32_t log2_int(uint32_t num)
 // there exists line size and cache size / assoc globals in sim.cpp
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
-  c->stat_write_access++;
-  c->stat_read_access++;
 
   // get the log2 of the linesize, then we shift the addr over by that many and get the index
   // then and with num_ways - 1, which should give us all the bits representing the index.
   uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_ways-1);
   uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_ways)));
+
+  // printf("%x %x %x %u %u\n", lineaddr, index, tag, log2_int(CACHE_LINESIZE), log2_int(c->num_ways));
+
+  if (is_write) {
+    c->stat_write_access++;
+  }
+  else {
+    c->stat_read_access++;
+  }
 
   uint32_t i;
   for(i=0; i<c->num_sets; i++)
@@ -100,6 +107,9 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
     // not sure whether tag is the address or just tag bits of address.
     if(c->sets[i].line[index].valid && c->sets[i].line[index].tag == tag) // == lineaddr
     {
+      if (is_write) {
+        c->sets[i].line[index].dirty = 1;
+      }
       return HIT;
     }
   }
@@ -159,6 +169,7 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 
   // we are evicting it, so check if it is dirty
   if ( c->sets[lru].line[index].dirty ) {
+    c->sets[lru].line[index].dirty = 0;
     c->stat_dirty_evicts++;
   }
 
