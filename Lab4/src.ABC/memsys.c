@@ -175,8 +175,8 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
   if(type == ACCESS_TYPE_IFETCH){
     Flag outcome=cache_access(sys->icache, lineaddr, FALSE, core_id);
     if(outcome==MISS){
+      delay = memsys_L2_access(sys, lineaddr, FALSE, core_id);
       cache_install(sys->icache, lineaddr, FALSE, core_id);
-      delay = L2CACHE_HIT_LATENCY;
     }
     else {
       delay = ICACHE_HIT_LATENCY;
@@ -187,8 +187,8 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
   if(type == ACCESS_TYPE_LOAD){
     Flag outcome=cache_access(sys->dcache, lineaddr, FALSE, core_id);
     if(outcome==MISS){
+      delay = memsys_L2_access(sys, lineaddr, FALSE, core_id);
       cache_install(sys->dcache, lineaddr, FALSE, core_id);
-      delay = L2CACHE_HIT_LATENCY;
     }
     else {
       delay = DCACHE_HIT_LATENCY;
@@ -199,8 +199,8 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
   if(type == ACCESS_TYPE_STORE){
     Flag outcome=cache_access(sys->dcache, lineaddr, TRUE, core_id);
     if(outcome==MISS){
+      delay = memsys_L2_access(sys, lineaddr, TRUE, core_id);
       cache_install(sys->dcache, lineaddr, TRUE, core_id);
-      delay = L2CACHE_HIT_LATENCY;
     }
     else {
       delay = DCACHE_HIT_LATENCY;
@@ -217,7 +217,16 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
 /////////////////////////////////////////////////////////////////////
 
 uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core_id){
-  uns64 delay = L2CACHE_HIT_LATENCY;
+
+  uns64 delay = 0;
+
+  Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
+  if (outcome == HIT) {
+    delay = L2CACHE_HIT_LATENCY;
+  } 
+  else {
+    delay = dram_access(sys->dram, lineaddr, is_writeback);
+  }
 
   //To get the delay of L2 MISS, you must use the dram_access() function
   //To perform writebacks to memory, you must use the dram_access() function
