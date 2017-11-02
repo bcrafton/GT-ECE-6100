@@ -168,22 +168,43 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, Access_Type type, uns core
 // --------------- DO NOT CHANGE THE CODE ABOVE THIS LINE ----------
 ////////////////////////////////////////////////////////////////////
 
-uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type,uns core_id){
+uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns core_id){
   uns64 delay=0;
 
  
   if(type == ACCESS_TYPE_IFETCH){
-    // YOU NEED TO WRITE THIS PART AND UPDATE DELAY
+    Flag outcome=cache_access(sys->icache, lineaddr, FALSE, core_id);
+    if(outcome==MISS){
+      cache_install(sys->icache, lineaddr, FALSE, core_id);
+      delay = L2CACHE_HIT_LATENCY;
+    }
+    else {
+      delay = ICACHE_HIT_LATENCY;
+    }
   }
     
 
   if(type == ACCESS_TYPE_LOAD){
-    // YOU NEED TO WRITE THIS PART AND UPDATE DELAY
+    Flag outcome=cache_access(sys->dcache, lineaddr, FALSE, core_id);
+    if(outcome==MISS){
+      cache_install(sys->dcache, lineaddr, FALSE, core_id);
+      delay = L2CACHE_HIT_LATENCY;
+    }
+    else {
+      delay = DCACHE_HIT_LATENCY;
+    }
   }
   
 
   if(type == ACCESS_TYPE_STORE){
-    // YOU NEED TO WRITE THIS PART AND UPDATE DELAY
+    Flag outcome=cache_access(sys->dcache, lineaddr, TRUE, core_id);
+    if(outcome==MISS){
+      cache_install(sys->dcache, lineaddr, TRUE, core_id);
+      delay = L2CACHE_HIT_LATENCY;
+    }
+    else {
+      delay = DCACHE_HIT_LATENCY;
+    }
   }
  
   return delay;
