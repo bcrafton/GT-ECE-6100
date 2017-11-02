@@ -221,12 +221,12 @@ uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core
   uns64 delay = 0;
 
   Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
-  if (outcome == HIT) {
-    delay = L2CACHE_HIT_LATENCY;
+  if (outcome == MISS) {
+    delay = dram_access(sys->dram, lineaddr, is_writeback);
     cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
   } 
   else {
-    delay = dram_access(sys->dram, lineaddr, is_writeback);
+    delay = L2CACHE_HIT_LATENCY;
   }
 
   //To get the delay of L2 MISS, you must use the dram_access() function
