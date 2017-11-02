@@ -223,6 +223,7 @@ uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core
   Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
   if (outcome == HIT) {
     delay = L2CACHE_HIT_LATENCY;
+    cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
   } 
   else {
     delay = dram_access(sys->dram, lineaddr, is_writeback);
