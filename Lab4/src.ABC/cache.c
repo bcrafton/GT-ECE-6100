@@ -89,11 +89,12 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 
   // get the log2 of the linesize, then we shift the addr over by that many and get the index
   // then and with num_sets - 1, which should give us all the bits representing the index.
-  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1);
+  // uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1);
+  uint32_t index = lineaddr % c->num_sets;
   assert(index < c->num_sets);
 
-  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
-
+  //uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
+  uint32_t tag = lineaddr / c->num_sets;
   // printf("%x %x %x %u %u\n", lineaddr, index, tag, log2_int(CACHE_LINESIZE), log2_int(c->num_sets));
 
   if (is_write) {
@@ -160,10 +161,12 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
 
   // 16-1 = 15 = 1111 which is the mask we want.
-  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1); 
+  // uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1); 
+  uint32_t index = lineaddr % c->num_sets;
   assert(index < c->num_sets);
 
-  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
+  // uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
+  uint32_t tag = lineaddr / c->num_sets;
 
   // Find victim using cache_find_victim
   uint32_t lru = find_lru(c, index);
