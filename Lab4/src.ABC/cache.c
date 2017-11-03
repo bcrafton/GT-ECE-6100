@@ -68,6 +68,7 @@ void    cache_print_stats    (Cache *c, char *header){
 typedef unsigned int uint32_t;
 typedef unsigned long uint64_t;
 
+/*
 uint32_t log2_int(uint32_t num)
 {
   uint32_t bit;
@@ -82,6 +83,7 @@ uint32_t log2_int(uint32_t num)
   // log2 of 0 = 0 ?
   return 0;
 }
+*/
 
 // there exists line size and cache size / assoc globals in sim.cpp
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
@@ -133,6 +135,7 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
 
+/*
 // there exists line size and cache size / assoc globals in sim.cpp
 uint32_t find_lru(Cache *c, uint32_t index)
 {
@@ -154,6 +157,7 @@ uint32_t find_lru(Cache *c, uint32_t index)
   }
   return lru;
 }
+*/
 
 // there exists line size and cache size / assoc globals in sim.cpp
 void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
@@ -169,21 +173,21 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   uint32_t tag = lineaddr / c->num_sets;
 
   // Find victim using cache_find_victim
-  uint32_t lru = find_lru(c, index);
-  assert(lru < c->num_ways);
+  uint32_t victim = cache_find_victim(c, index, core_id);
+  assert(victim < c->num_ways);
 
   // we are evicting it, so check if it is dirty
-  if ( c->sets[index].line[lru].dirty ) {
-    c->sets[index].line[lru].dirty = 0;
+  if ( c->sets[index].line[victim].dirty ) {
+    c->sets[index].line[victim].dirty = 0;
     c->stat_dirty_evicts++;
   }
 
   // Initialize the evicted entry
-  c->sets[index].line[lru].valid = 1;
-  c->sets[index].line[lru].dirty = 0;
-  c->sets[index].line[lru].tag = tag;
-  c->sets[index].line[lru].core_id = 0;
-  c->sets[index].line[lru].last_access_time = cycle; // defined at top of file for this reason
+  c->sets[index].line[victim].valid = 1;
+  c->sets[index].line[victim].dirty = 0;
+  c->sets[index].line[victim].tag = tag;
+  c->sets[index].line[victim].core_id = 0;
+  c->sets[index].line[victim].last_access_time = cycle; // defined at top of file for this reason
 
   // Initialize the victime entry
   // what do here?
@@ -197,8 +201,30 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 uns cache_find_victim(Cache *c, uns set_index, uns core_id){
   uns victim=0;
 
-  // TODO: Write this using a switch case statement
-  
+  int lru = -1;
+  uint64_t oldest;
+
+  int i;
+  for(i=0; i<c->num_ways; i++)
+  {
+    if(!c->sets[set_index].line[i].valid)
+    {
+      return i;
+    }
+    else if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
+    {
+      lru = i;
+      oldest = c->sets[set_index].line[i].last_access_time;
+    }
+  }
+
+  if (c->repl_policy == 0) {
+    victim = lru;
+  }
+  else {
+    victim = rand() % c->num_ways;
+  }
+
   return victim;
 }
 
