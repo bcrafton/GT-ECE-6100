@@ -88,11 +88,13 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
 
   // get the log2 of the linesize, then we shift the addr over by that many and get the index
-  // then and with num_ways - 1, which should give us all the bits representing the index.
-  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_ways-1);
-  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_ways)));
+  // then and with num_sets - 1, which should give us all the bits representing the index.
+  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1);
+  assert(index < c->num_sets);
 
-  // printf("%x %x %x %u %u\n", lineaddr, index, tag, log2_int(CACHE_LINESIZE), log2_int(c->num_ways));
+  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
+
+  // printf("%x %x %x %u %u\n", lineaddr, index, tag, log2_int(CACHE_LINESIZE), log2_int(c->num_sets));
 
   if (is_write) {
     c->stat_write_access++;
@@ -102,13 +104,13 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   }
 
   uint32_t i;
-  for(i=0; i<c->num_sets; i++)
+  for(i=0; i<c->num_ways; i++)
   {
     // not sure whether tag is the address or just tag bits of address.
-    if(c->sets[i].line[index].valid && c->sets[i].line[index].tag == tag) // == lineaddr
+    if(c->sets[index].line[i].valid && (c->sets[index].line[i].tag == tag)) // == lineaddr
     {
       if (is_write) {
-        c->sets[i].line[index].dirty = 1;
+        c->sets[index].line[i].dirty = 1;
       }
       return HIT;
     }
@@ -137,16 +139,16 @@ uint32_t find_lru(Cache *c, uint32_t index)
   uint64_t oldest;
 
   int i;
-  for(i=0; i<c->num_sets; i++)
+  for(i=0; i<c->num_ways; i++)
   {
-    if(!c->sets[i].line[index].valid)
+    if(!c->sets[index].line[i].valid)
     {
       return i;
     }
-    else if(lru == -1 || c->sets[i].line[index].last_access_time < oldest)
+    else if(lru == -1 || (c->sets[index].line[i].last_access_time < oldest))
     {
       lru = i;
-      oldest = c->sets[i].line[index].last_access_time;
+      oldest = c->sets[index].line[i].last_access_time;
     }
   }
   return lru;
@@ -158,27 +160,27 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
 
   // 16-1 = 15 = 1111 which is the mask we want.
-  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_ways-1); 
-  assert(index < c->num_ways);
+  uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1); 
+  assert(index < c->num_sets);
 
-  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_ways)) );
+  uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
 
   // Find victim using cache_find_victim
   uint32_t lru = find_lru(c, index);
-  assert(lru < c->num_sets);
+  assert(lru < c->num_ways);
 
   // we are evicting it, so check if it is dirty
-  if ( c->sets[lru].line[index].dirty ) {
-    c->sets[lru].line[index].dirty = 0;
+  if ( c->sets[index].line[lru].dirty ) {
+    c->sets[index].line[lru].dirty = 0;
     c->stat_dirty_evicts++;
   }
 
   // Initialize the evicted entry
-  c->sets[lru].line[index].valid = 1;
-  c->sets[lru].line[index].dirty = 0;
-  c->sets[lru].line[index].tag = tag;
-  c->sets[lru].line[index].core_id = 0;
-  c->sets[lru].line[index].last_access_time = cycle; // defined at top of file for this reason
+  c->sets[index].line[lru].valid = 1;
+  c->sets[index].line[lru].dirty = 0;
+  c->sets[index].line[lru].tag = tag;
+  c->sets[index].line[lru].core_id = 0;
+  c->sets[index].line[lru].last_access_time = cycle; // defined at top of file for this reason
 
   // Initialize the victime entry
   // what do here?
