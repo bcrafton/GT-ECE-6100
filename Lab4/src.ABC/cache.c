@@ -115,6 +115,7 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
       if (is_write) {
         c->sets[index].line[i].dirty = 1;
       }
+      c->sets[index].line[i].last_access_time = cycle;
       return HIT;
     }
   }
