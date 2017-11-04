@@ -189,6 +189,11 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
     if(outcome==MISS){
       delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
       cache_install(sys->dcache, lineaddr, FALSE, core_id);
+
+      if (sys->dcache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+      }
     }
     else {
       delay = DCACHE_HIT_LATENCY;
@@ -199,8 +204,13 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
   if(type == ACCESS_TYPE_STORE){
     Flag outcome=cache_access(sys->dcache, lineaddr, TRUE, core_id);
     if(outcome==MISS){
-      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, TRUE, core_id);
+      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
       cache_install(sys->dcache, lineaddr, TRUE, core_id);
+
+      if (sys->dcache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+      }
     }
     else {
       delay = DCACHE_HIT_LATENCY;
@@ -220,13 +230,26 @@ uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core
 
   uns64 delay = 0;
 
-  Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
-  if (outcome == MISS) {
-    delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, is_writeback);
-    cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
-  } 
+  if (is_writeback) {
+    Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
+    if (outcome == MISS) {
+      delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, is_writeback);
+      cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
+    } 
+    else {
+      delay = L2CACHE_HIT_LATENCY;
+    }
+  }
+
   else {
-    delay = L2CACHE_HIT_LATENCY;
+    Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
+    if (outcome == MISS) {
+      delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, is_writeback);
+      cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
+    } 
+    else {
+      delay = L2CACHE_HIT_LATENCY;
+    }
   }
 
   //To get the delay of L2 MISS, you must use the dram_access() function
@@ -235,3 +258,8 @@ uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core
 
   return delay;
 }
+
+
+
+
+

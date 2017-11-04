@@ -178,20 +178,18 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   assert(victim < c->num_ways);
 
   // we are evicting it, so check if it is dirty
+  // Initialize the evicted entry
   if ( c->sets[index].line[victim].dirty ) {
-    c->sets[index].line[victim].dirty = 0;
     c->stat_dirty_evicts++;
   }
+  c->last_evicted_line = c->sets[index].line[victim];
 
-  // Initialize the evicted entry
+  // Initialize the victime entry
   c->sets[index].line[victim].valid = 1;
   c->sets[index].line[victim].dirty = 0;
   c->sets[index].line[victim].tag = tag;
   c->sets[index].line[victim].core_id = 0;
   c->sets[index].line[victim].last_access_time = cycle; // defined at top of file for this reason
-
-  // Initialize the victime entry
-  // what do here?
 }
 
 ////////////////////////////////////////////////////////////////////
