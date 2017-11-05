@@ -24,6 +24,8 @@ extern uns64  ICACHE_ASSOC;
 extern uns64  L2CACHE_SIZE; 
 extern uns64  L2CACHE_ASSOC; 
 
+extern uns64 cycle; 
+
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
@@ -177,6 +179,11 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
     if(outcome==MISS){
       delay = ICACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
       cache_install(sys->icache, lineaddr, FALSE, core_id);
+
+      if (sys->icache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->icache->last_evicted_line.tag * sys->icache->num_sets) | (lineaddr % sys->icache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->icache->last_evicted_line.core_id);
+      }
     }
     else {
       delay = ICACHE_HIT_LATENCY;
@@ -193,6 +200,7 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
       if (sys->dcache->last_evicted_line.dirty) {
         uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
         memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+        // printf("%lu\n", cycle);
       }
     }
     else {
@@ -210,6 +218,7 @@ uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns cor
       if (sys->dcache->last_evicted_line.dirty) {
         uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
         memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+        // printf("%lu\n", cycle);
       }
     }
     else {
@@ -230,26 +239,18 @@ uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core
 
   uns64 delay = 0;
 
-  if (is_writeback) {
-    Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
-    if (outcome == MISS) {
-      delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, is_writeback);
-      cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
-    } 
-    else {
-      delay = L2CACHE_HIT_LATENCY;
-    }
-  }
+  Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
+  if (outcome == MISS) {
+    delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, FALSE);
+    cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
 
-  else {
-    Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
-    if (outcome == MISS) {
-      delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, is_writeback);
-      cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
-    } 
-    else {
-      delay = L2CACHE_HIT_LATENCY;
+    if (sys->l2cache->last_evicted_line.dirty) {
+      uns64 victim_lineaddr = (sys->l2cache->last_evicted_line.tag * sys->l2cache->num_sets) | (lineaddr % sys->l2cache->num_sets);
+      dram_access(sys->dram, victim_lineaddr, TRUE);
     }
+  } 
+  else {
+    delay = L2CACHE_HIT_LATENCY;
   }
 
   //To get the delay of L2 MISS, you must use the dram_access() function

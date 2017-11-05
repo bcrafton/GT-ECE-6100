@@ -186,7 +186,7 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 
   // Initialize the victime entry
   c->sets[index].line[victim].valid = 1;
-  c->sets[index].line[victim].dirty = 0;
+  c->sets[index].line[victim].dirty = is_write;
   c->sets[index].line[victim].tag = tag;
   c->sets[index].line[victim].core_id = 0;
   c->sets[index].line[victim].last_access_time = cycle; // defined at top of file for this reason
