@@ -15,15 +15,15 @@
 
 ########## ---------------  B ---------------- ################
 
-# ./sim -mode 2 -L2sizeKB 1024 ../traces/bzip2.mtr.gz  > ../results/B.S1MB.bzip2.res 
-# ./sim -mode 2 -L2sizeKB 1024 ../traces/lbm.mtr.gz    > ../results/B.S1MB.lbm.res &
-# ./sim -mode 2 -L2sizeKB 1024 ../traces/libq.mtr.gz    > ../results/B.S1MB.libq.res
+./sim -mode 2 -L2sizeKB 1024 ../traces/bzip2.mtr.gz  > ../results/B.S1MB.bzip2.res 
+./sim -mode 2 -L2sizeKB 1024 ../traces/lbm.mtr.gz    > ../results/B.S1MB.lbm.res &
+./sim -mode 2 -L2sizeKB 1024 ../traces/libq.mtr.gz    > ../results/B.S1MB.libq.res
 
 ########## ---------------  C ---------------- ################
 
-# ./sim -mode 3 -L2sizeKB 1024 ../traces/bzip2.mtr.gz  > ../results/C.S1MB.bzip2.res 
-# ./sim -mode 3 -L2sizeKB 1024 ../traces/lbm.mtr.gz    > ../results/C.S1MB.lbm.res &
-# ./sim -mode 3 -L2sizeKB 1024 ../traces/libq.mtr.gz    > ../results/C.S1MB.libq.res 
+./sim -mode 3 -L2sizeKB 1024 ../traces/bzip2.mtr.gz  > ../results/C.S1MB.bzip2.res 
+./sim -mode 3 -L2sizeKB 1024 ../traces/lbm.mtr.gz    > ../results/C.S1MB.lbm.res &
+./sim -mode 3 -L2sizeKB 1024 ../traces/libq.mtr.gz    > ../results/C.S1MB.libq.res 
 
 
 echo "All Done. Check the .res file in ../results directory";

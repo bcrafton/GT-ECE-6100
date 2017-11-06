@@ -4,7 +4,7 @@
 
 #include "cache.h"
 
-extern uns64 CACHE_LINESIZE; // adding this here because need line size.
+
 extern uns64 cycle; // You can use this as timestamp for LRU
 
 ////////////////////////////////////////////////////////////////////

@@ -24,8 +24,6 @@ extern uns64  ICACHE_ASSOC;
 extern uns64  L2CACHE_SIZE; 
 extern uns64  L2CACHE_ASSOC; 
 
-extern uns64 cycle; 
-
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
@@ -156,9 +154,9 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, Access_Type type, uns core
   }
 
   if(needs_dcache_access){
-    Flag outcome=cache_access(sys->dcache, lineaddr, is_write, core_id);
+    Flag outcome=cache_access(sys->dcache, lineaddr, is_write,core_id);
     if(outcome==MISS){
-      cache_install(sys->dcache, lineaddr, is_write, core_id);
+      cache_install(sys->dcache, lineaddr, is_write,core_id);
     }
   }
 
