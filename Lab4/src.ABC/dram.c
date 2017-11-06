@@ -114,22 +114,17 @@ uns64   dram_access_sim_rowbuf(DRAM *dram, Addr lineaddr, Flag is_dram_write){
   // its a weird number for sure.
 
   // You need to write this fuction to track open rows 
-  if (is_dram_write) {
-    open_rows[bank_index] = -1;
-    delay = DRAM_T_PRE + DRAM_T_ACT + DRAM_T_CAS + DRAM_T_BUS;
+
+  if(open_rows[bank_index] == -1) {
+    open_rows[bank_index] = row_buf_index;
+    delay = DRAM_T_ACT + DRAM_T_CAS + DRAM_T_BUS;
+  }
+  else if(open_rows[bank_index] == row_buf_index) {
+    delay = DRAM_T_CAS + DRAM_T_BUS;
   }
   else {
-    if(open_rows[bank_index] == -1) {
-      open_rows[bank_index] = row_buf_index;
-      delay = DRAM_T_PRE + DRAM_T_ACT + DRAM_T_CAS + DRAM_T_BUS;
-    }
-    else if(open_rows[bank_index] == row_buf_index) {
-      delay = DRAM_T_CAS + DRAM_T_BUS;
-    }
-    else {
-      open_rows[bank_index] = row_buf_index;
-      delay = DRAM_T_PRE + DRAM_T_ACT + DRAM_T_CAS + DRAM_T_BUS;
-    }
+    open_rows[bank_index] = row_buf_index;
+    delay = DRAM_T_PRE + DRAM_T_ACT + DRAM_T_CAS + DRAM_T_BUS;
   }
 
   // You will need to compute delay based on row hit/miss/empty
