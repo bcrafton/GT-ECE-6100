@@ -27,6 +27,8 @@ extern uns64  L2CACHE_ASSOC;
 extern uns64  L2CACHE_REPL;
 extern uns64  NUM_CORES;
 
+extern uns64 cycle;
+
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
@@ -75,18 +77,9 @@ uns64 memsys_access(Memsys *sys, Addr addr, Access_Type type, uns core_id)
 {
   uns delay=0;
 
-
   // all cache transactions happen at line granularity, so get lineaddr
   Addr lineaddr=addr/CACHE_LINESIZE;
   
-
-  if(SIM_MODE==SIM_MODE_A){
-    delay = memsys_access_modeA(sys,lineaddr,type,core_id);
-  }else{
-    delay = memsys_access_modeBC(sys,lineaddr,type,core_id);
-  }
-
-
   if(SIM_MODE==SIM_MODE_A){
     delay = memsys_access_modeA(sys,lineaddr,type, core_id);
   }
@@ -183,15 +176,98 @@ void memsys_print_stats(Memsys *sys)
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+
 uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, Access_Type type, uns core_id){
-  // Not needed for Phase 2
+  Flag needs_dcache_access=FALSE;
+  Flag is_write=FALSE;
+  
+  if(type == ACCESS_TYPE_IFETCH){
+    // no icache in this mode
+  }
+    
+  if(type == ACCESS_TYPE_LOAD){
+    needs_dcache_access=TRUE;
+    is_write=FALSE;
+  }
+  
+  if(type == ACCESS_TYPE_STORE){
+    needs_dcache_access=TRUE;
+    is_write=TRUE;
+  }
+
+  if(needs_dcache_access){
+    Flag outcome=cache_access(sys->dcache, lineaddr, is_write,core_id);
+    if(outcome==MISS){
+      cache_install(sys->dcache, lineaddr, is_write,core_id);
+    }
+  }
+
+  // timing is not simulated in Part A
   return 0;
 }
 
+////////////////////////////////////////////////////////////////////
+// --------------- DO NOT CHANGE THE CODE ABOVE THIS LINE ----------
+////////////////////////////////////////////////////////////////////
 
-uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type,uns core_id){
-  // Not needed for Phase 2
-  return 0;
+uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns core_id){
+  uns64 delay=0;
+ 
+  if(type == ACCESS_TYPE_IFETCH){
+    Flag outcome=cache_access(sys->icache, lineaddr, FALSE, core_id);
+    if(outcome==MISS){
+      delay = ICACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
+      cache_install(sys->icache, lineaddr, FALSE, core_id);
+
+      if (sys->icache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->icache->last_evicted_line.tag * sys->icache->num_sets) | (lineaddr % sys->icache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->icache->last_evicted_line.core_id);
+      }
+    }
+    else {
+      delay = ICACHE_HIT_LATENCY;
+    }
+  }
+    
+
+  if(type == ACCESS_TYPE_LOAD){
+    Flag outcome=cache_access(sys->dcache, lineaddr, FALSE, core_id);
+    if(outcome==MISS){
+      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
+      cache_install(sys->dcache, lineaddr, FALSE, core_id);
+
+      if (sys->dcache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+        // printf("%lu\n", cycle);
+      }
+    }
+    else {
+      delay = DCACHE_HIT_LATENCY;
+    }
+  }
+  
+
+  if(type == ACCESS_TYPE_STORE){
+    Flag outcome=cache_access(sys->dcache, lineaddr, TRUE, core_id);
+    if(outcome==MISS){
+      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
+      cache_install(sys->dcache, lineaddr, TRUE, core_id);
+
+      if (sys->dcache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+        // printf("%lu\n", cycle);
+      }
+    }
+    else {
+      delay = DCACHE_HIT_LATENCY;
+    }
+  }
+ 
+  return delay;
 }
 
 
@@ -257,7 +333,22 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
 /////////////////////////////////////////////////////////////////////
 
 uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core_id){
-  uns64 delay = L2CACHE_HIT_LATENCY;
+
+  uns64 delay = 0;
+
+  Flag outcome=cache_access(sys->l2cache, lineaddr, is_writeback, core_id);
+  if (outcome == MISS) {
+    delay = L2CACHE_HIT_LATENCY + dram_access(sys->dram, lineaddr, FALSE);
+    cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
+
+    if (sys->l2cache->last_evicted_line.dirty) {
+      uns64 victim_lineaddr = (sys->l2cache->last_evicted_line.tag * sys->l2cache->num_sets) | (lineaddr % sys->l2cache->num_sets);
+      dram_access(sys->dram, victim_lineaddr, TRUE);
+    }
+  } 
+  else {
+    delay = L2CACHE_HIT_LATENCY;
+  }
 
   //To get the delay of L2 MISS, you must use the dram_access() function
   //To perform writebacks to memory, you must use the dram_access() function

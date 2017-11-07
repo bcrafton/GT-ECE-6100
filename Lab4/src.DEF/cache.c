@@ -66,12 +66,69 @@ void    cache_print_stats    (Cache *c, char *header){
 // Update appropriate stats
 ////////////////////////////////////////////////////////////////////
 
-Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
-  Flag outcome=MISS;
+typedef unsigned int uint32_t;
+typedef unsigned long uint64_t;
 
+/*
+uint32_t log2_int(uint32_t num)
+{
+  uint32_t bit;
+  for(bit = 31; bit > 0; bit--)
+  {
+    uint32_t mask = 1 << bit;
+    if((mask & num) > 0)
+    {
+      return bit;
+    }
+  }
+  // log2 of 0 = 0 ?
+  return 0;
+}
+*/
+
+// there exists line size and cache size / assoc globals in sim.cpp
+Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
+
+  // get the log2 of the linesize, then we shift the addr over by that many and get the index
+  // then and with num_sets - 1, which should give us all the bits representing the index.
+  // uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1);
+  uint32_t index = lineaddr % c->num_sets;
+  assert(index < c->num_sets);
+
+  //uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
+  uint32_t tag = lineaddr / c->num_sets;
+  // printf("%x %x %x %u %u\n", lineaddr, index, tag, log2_int(CACHE_LINESIZE), log2_int(c->num_sets));
+
+  if (is_write) {
+    c->stat_write_access++;
+  }
+  else {
+    c->stat_read_access++;
+  }
+
+  uint32_t i;
+  for(i=0; i<c->num_ways; i++)
+  {
+    // not sure whether tag is the address or just tag bits of address.
+    if(c->sets[index].line[i].valid && (c->sets[index].line[i].tag == tag)) // == lineaddr
+    {
+      if (is_write) {
+        c->sets[index].line[i].dirty = 1;
+      }
+      c->sets[index].line[i].last_access_time = cycle;
+      return HIT;
+    }
+  }
   
-  return outcome;
+  if (is_write) {
+    c->stat_write_miss++;
+  }
+  else {
+    c->stat_read_miss++;
+  }
+
+  return MISS;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -80,13 +137,60 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
 
+/*
+// there exists line size and cache size / assoc globals in sim.cpp
+uint32_t find_lru(Cache *c, uint32_t index)
+{
+  int lru = -1;
+  uint64_t oldest;
+
+  int i;
+  for(i=0; i<c->num_ways; i++)
+  {
+    if(!c->sets[index].line[i].valid)
+    {
+      return i;
+    }
+    else if(lru == -1 || (c->sets[index].line[i].last_access_time < oldest))
+    {
+      lru = i;
+      oldest = c->sets[index].line[i].last_access_time;
+    }
+  }
+  return lru;
+}
+*/
+
+// there exists line size and cache size / assoc globals in sim.cpp
 void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 
   // Your Code Goes Here
+
+  // 16-1 = 15 = 1111 which is the mask we want.
+  // uint32_t index = (lineaddr >> log2_int(CACHE_LINESIZE)) & (c->num_sets-1); 
+  uint32_t index = lineaddr % c->num_sets;
+  assert(index < c->num_sets);
+
+  // uint32_t tag = (lineaddr >> (log2_int(CACHE_LINESIZE) + log2_int(c->num_sets)));
+  uint32_t tag = lineaddr / c->num_sets;
+
   // Find victim using cache_find_victim
+  uint32_t victim = cache_find_victim(c, index, core_id);
+  assert(victim < c->num_ways);
+
+  // we are evicting it, so check if it is dirty
   // Initialize the evicted entry
+  if ( c->sets[index].line[victim].dirty ) {
+    c->stat_dirty_evicts++;
+  }
+  c->last_evicted_line = c->sets[index].line[victim];
+
   // Initialize the victime entry
- 
+  c->sets[index].line[victim].valid = 1;
+  c->sets[index].line[victim].dirty = is_write;
+  c->sets[index].line[victim].tag = tag;
+  c->sets[index].line[victim].core_id = 0;
+  c->sets[index].line[victim].last_access_time = cycle; // defined at top of file for this reason
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -97,8 +201,30 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 uns cache_find_victim(Cache *c, uns set_index, uns core_id){
   uns victim=0;
 
-  // TODO: Write this using a switch case statement
-  
+  int lru = -1;
+  uint64_t oldest;
+
+  int i;
+  for(i=0; i<c->num_ways; i++)
+  {
+    if(!c->sets[set_index].line[i].valid)
+    {
+      return i;
+    }
+    else if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
+    {
+      lru = i;
+      oldest = c->sets[set_index].line[i].last_access_time;
+    }
+  }
+
+  if (c->repl_policy == 0) {
+    victim = lru;
+  }
+  else {
+    victim = rand() % c->num_ways;
+  }
+
   return victim;
 }
 
