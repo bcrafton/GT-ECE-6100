@@ -189,7 +189,7 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   c->sets[index].line[victim].valid = 1;
   c->sets[index].line[victim].dirty = is_write;
   c->sets[index].line[victim].tag = tag;
-  c->sets[index].line[victim].core_id = 0;
+  c->sets[index].line[victim].core_id = core_id;
   c->sets[index].line[victim].last_access_time = cycle; // defined at top of file for this reason
 }
 
@@ -197,7 +197,7 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // You may find it useful to split victim selection from install
 ////////////////////////////////////////////////////////////////////
 
-
+// is there anything special about this for multiple cores?
 uns cache_find_victim(Cache *c, uns set_index, uns core_id){
   uns victim=0;
 

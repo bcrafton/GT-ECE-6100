@@ -37,7 +37,7 @@ uns64       L2CACHE_REPL    = 0; // 0:LRU 1:RND 2:SWP 3:UCP
 
 uns64       SWP_CORE0_WAYS  = 0;
 
-uns64       NUM_CORES       = 1;
+uns64       NUM_CORES       = 2;
 
 
 /***************************************************************************************

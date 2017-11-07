@@ -301,26 +301,61 @@ uns64 memsys_convert_vpn_to_pfn(Memsys *sys, uns64 vpn, uns core_id){
 uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns core_id){
   uns64 delay=0;
   Addr p_lineaddr=0;
-
-  p_lineaddr=v_lineaddr;
+  
+  //   p_lineaddr=v_lineaddr;
 
   // TODO: First convert lineaddr from virtual (v) to physical (p) using the
   // function memsys_convert_vpn_to_pfn. Page size is defined to be 4KB.
   // NOTE: VPN_to_PFN operates at page granularity and returns page addr
 
+  p_lineaddr = memsys_convert_vpn_to_pfn(sys, v_lineaddr, core_id);
+  // p_lineaddr &= ~(PAGE_SIZE-1);
+  assert( (p_lineaddr & (PAGE_SIZE-1)) == 0);
+  p_lineaddr |= v_lineaddr & (PAGE_SIZE-1);
  
   if(type == ACCESS_TYPE_IFETCH){
-    // YOU NEED TO WRITE THIS PART AND UPDATE DELAY
+    Flag outcome=cache_access(sys->icache, p_lineaddr, FALSE, core_id);
+    if(outcome==MISS){
+      delay = ICACHE_HIT_LATENCY + memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
+      cache_install(sys->icache, p_lineaddr, FALSE, core_id);
+    }
+    else {
+      delay = ICACHE_HIT_LATENCY;
+    }
   }
     
 
   if(type == ACCESS_TYPE_LOAD){
-    // YOU NEED TO WRITE THIS PART AND UPDATE DELAY
+    Flag outcome=cache_access(sys->dcache, p_lineaddr, FALSE, core_id);
+    if(outcome==MISS){
+      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
+      cache_install(sys->dcache, p_lineaddr, FALSE, core_id);
+
+      if (sys->dcache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (p_lineaddr % sys->dcache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+      }
+    }
+    else {
+      delay = DCACHE_HIT_LATENCY;
+    }
   }
   
 
   if(type == ACCESS_TYPE_STORE){
-    // YOU NEED TO WRITE THIS PART AND UPDATE DELAY
+    Flag outcome=cache_access(sys->dcache, p_lineaddr, TRUE, core_id);
+    if(outcome==MISS){
+      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
+      cache_install(sys->dcache, p_lineaddr, TRUE, core_id);
+
+      if (sys->dcache->last_evicted_line.dirty) {
+        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (p_lineaddr % sys->dcache->num_sets);
+        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
+      }
+    }
+    else {
+      delay = DCACHE_HIT_LATENCY;
+    }
   }
  
   return delay;
