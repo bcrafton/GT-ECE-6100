@@ -214,56 +214,42 @@ uns64 memsys_access_modeA(Memsys *sys, Addr lineaddr, Access_Type type, uns core
 
 uns64 memsys_access_modeBC(Memsys *sys, Addr lineaddr, Access_Type type, uns core_id){
   uns64 delay=0;
+  Cache* c;
+  uns write;
  
   if(type == ACCESS_TYPE_IFETCH){
-    Flag outcome=cache_access(sys->icache, lineaddr, FALSE, core_id);
-    if(outcome==MISS){
-      delay = ICACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
-      cache_install(sys->icache, lineaddr, FALSE, core_id);
-
-      if (sys->icache->last_evicted_line.dirty) {
-        uns64 victim_lineaddr = (sys->icache->last_evicted_line.tag * sys->icache->num_sets) | (lineaddr % sys->icache->num_sets);
-        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->icache->last_evicted_line.core_id);
-      }
-    }
-    else {
-      delay = ICACHE_HIT_LATENCY;
-    }
+    c = sys->icache;
+    delay = ICACHE_HIT_LATENCY;
+    write = FALSE;
   }
-    
 
-  if(type == ACCESS_TYPE_LOAD){
-    Flag outcome=cache_access(sys->dcache, lineaddr, FALSE, core_id);
-    if(outcome==MISS){
-      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
-      cache_install(sys->dcache, lineaddr, FALSE, core_id);
-
-      if (sys->dcache->last_evicted_line.dirty) {
-        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
-        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
-        // printf("%lu\n", cycle);
-      }
-    }
-    else {
-      delay = DCACHE_HIT_LATENCY;
-    }
+  else if(type == ACCESS_TYPE_LOAD){
+    c = sys->dcache;
+    delay = DCACHE_HIT_LATENCY;
+    write = FALSE;
   }
-  
 
-  if(type == ACCESS_TYPE_STORE){
-    Flag outcome=cache_access(sys->dcache, lineaddr, TRUE, core_id);
-    if(outcome==MISS){
-      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, lineaddr, FALSE, core_id);
-      cache_install(sys->dcache, lineaddr, TRUE, core_id);
+  else if(type == ACCESS_TYPE_STORE) {
+    c = sys->dcache;
+    delay = DCACHE_HIT_LATENCY;
+    write = TRUE;
+  }
 
-      if (sys->dcache->last_evicted_line.dirty) {
-        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (lineaddr % sys->dcache->num_sets);
-        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
-        // printf("%lu\n", cycle);
-      }
-    }
-    else {
-      delay = DCACHE_HIT_LATENCY;
+  else{
+    fprintf(stderr, "INVALID INST TYPE\n");
+    assert(0);
+  }
+
+  Flag outcome=cache_access(c, lineaddr, write, core_id);
+  if(outcome==MISS){
+    delay += memsys_L2_access(sys, lineaddr, FALSE, core_id);
+    cache_install(c, lineaddr, write, core_id);
+
+    if (c->last_evicted_line.dirty) {
+      uns64 victim_lineaddr = (c->last_evicted_line.tag * c->num_sets) | 
+                              (lineaddr % c->num_sets);
+
+      memsys_L2_access(sys, victim_lineaddr, TRUE, core_id);
     }
   }
  
@@ -347,10 +333,9 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
     delay += memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
     cache_install(c, p_lineaddr, write, core_id);
 
-    if (sys->dcache_coreid[core_id]->last_evicted_line.dirty) {
+    if (c->last_evicted_line.dirty) {
       uns64 victim_lineaddr = (c->last_evicted_line.tag * c->num_sets) | 
                               (p_lineaddr % c->num_sets);
-      // printf("%x\n", victim_lineaddr);
 
       memsys_L2_access(sys, victim_lineaddr, TRUE, core_id);
     }
