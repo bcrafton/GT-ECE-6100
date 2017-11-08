@@ -202,28 +202,64 @@ void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 uns cache_find_victim(Cache *c, uns set_index, uns core_id){
   uns victim=0;
 
-  int lru = -1;
-  uint64_t oldest;
+  if (c->repl_policy == 0) {
+    int lru = -1;
+    uint64_t oldest;
 
-  int i;
-  for(i=0; i<c->num_ways; i++)
-  {
-    if(!c->sets[set_index].line[i].valid)
+    int i;
+    for(i=0; i<c->num_ways; i++)
     {
-      return i;
+      if(!c->sets[set_index].line[i].valid)
+      {
+        return i;
+      }
+      else if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
+      {
+        lru = i;
+        oldest = c->sets[set_index].line[i].last_access_time;
+      }
     }
-    else if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
-    {
-      lru = i;
-      oldest = c->sets[set_index].line[i].last_access_time;
-    }
+
+    victim = lru;
+  }
+  else if(c->repl_policy == 1) {
+    victim = rand() % c->num_ways;
   }
 
-  if (c->repl_policy == 0) {
+  else if(c->repl_policy == 2) {
+    int lru = -1;
+    uint64_t oldest;
+
+    // hopefully it is as easy as this. 
+    int start, end;
+    if (core_id == 0) {
+      start = 0;
+      end = SWP_CORE0_WAYS;
+    }
+    else {
+      start = SWP_CORE0_WAYS;
+      end = c->num_ways;
+    }
+    
+    int i;
+    for(i=start; i<end; i++)
+    {
+      if(!c->sets[set_index].line[i].valid)
+      {
+        return i;
+      }
+      else if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
+      {
+        lru = i;
+        oldest = c->sets[set_index].line[i].last_access_time;
+      }
+    }
+
     victim = lru;
   }
   else {
-    victim = rand() % c->num_ways;
+    assert(0);
+    fprintf(stderr, "got policy did not expect\n");
   }
 
   return victim;
