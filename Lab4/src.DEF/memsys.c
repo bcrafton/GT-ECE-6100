@@ -284,6 +284,7 @@ uns64 memsys_convert_vpn_to_pfn(Memsys *sys, uns64 vpn, uns core_id){
 /////////////////////////////////////////////////////////////////////
 
 
+
 uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns core_id){
   Cache* c;
   uns write;
@@ -296,14 +297,17 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
   // function memsys_convert_vpn_to_pfn. Page size is defined to be 4KB.
   // NOTE: VPN_to_PFN operates at page granularity and returns page addr
 
-  uns pfn = memsys_convert_vpn_to_pfn(sys, v_lineaddr, core_id);
-  // printf("%x\n", pfn);
+  uns64 pfn = memsys_convert_vpn_to_pfn(sys, v_lineaddr, core_id);  
+  pfn &= ~(uns64)(PAGE_SIZE/CACHE_LINESIZE-1);
+  assert( (pfn & (PAGE_SIZE/CACHE_LINESIZE-1)) == 0);
 
-  // p_lineaddr &= ~(PAGE_SIZE-1);
-  // assert( (p_lineaddr & (PAGE_SIZE-1)) == 0);
+  uns64 offset = v_lineaddr & (PAGE_SIZE/CACHE_LINESIZE-1);
+  assert(offset < (PAGE_SIZE/CACHE_LINESIZE));
 
-  p_lineaddr |= pfn;
-  p_lineaddr |= v_lineaddr & (PAGE_SIZE-1);
+  p_lineaddr |= pfn;  
+  p_lineaddr |= offset;
+
+  // assert(p_lineaddr == pfn);
 
   if(type == ACCESS_TYPE_IFETCH){
     c = sys->icache_coreid[core_id];
