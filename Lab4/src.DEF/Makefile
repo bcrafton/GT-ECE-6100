@@ -8,7 +8,7 @@ PFLAGS    := -pg
 
 
 all: 
-	${CC} ${CFLAGS} core.c dram.c cache.c  sim.c memsys.c   -o ${SIM}
+	${CC} ${CFLAGS} ${DFLAGS} core.c dram.c cache.c  sim.c memsys.c   -o ${SIM}
 
 
 clean: 

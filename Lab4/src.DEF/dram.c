@@ -84,20 +84,9 @@ uns64   dram_access(DRAM *dram,Addr lineaddr, Flag is_dram_write){
 // Modify the function below only if you are attempting Part C 
 ///////////////////////////////////////////////////////////////////
 
-static int init = 0;
-
 uns64   dram_access_sim_rowbuf(DRAM *dram, Addr lineaddr, Flag is_dram_write){
   uns64 delay=0;
 
-/*
-  if (init==0) {
-    init = 1;
-    int i;
-    for(i=0; i<DRAM_BANKS; i++) {
-      open_rows[i] = -1;
-    }
-  }
-*/
   static int open_rows[DRAM_BANKS] = {-1};
 
   // Assume a mapping with consecutive lines in the same row

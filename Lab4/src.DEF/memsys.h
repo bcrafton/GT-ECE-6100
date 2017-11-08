@@ -11,6 +11,7 @@
 typedef struct Memsys   Memsys;
 
 struct Memsys {
+  // want to delete these for christ sakes
   Cache *dcache;  // For Part A
   Cache *icache;  // For Part A,B,C
 

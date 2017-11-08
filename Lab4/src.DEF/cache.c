@@ -89,6 +89,7 @@ uint32_t log2_int(uint32_t num)
 // there exists line size and cache size / assoc globals in sim.cpp
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
+  assert(c != NULL);
 
   // get the log2 of the linesize, then we shift the addr over by that many and get the index
   // then and with num_sets - 1, which should give us all the bits representing the index.

@@ -299,6 +299,8 @@ uns64 memsys_convert_vpn_to_pfn(Memsys *sys, uns64 vpn, uns core_id){
 
 
 uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns core_id){
+  Cache* c;
+  uns write;
   uns64 delay=0;
   Addr p_lineaddr=0;
   
@@ -308,53 +310,49 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
   // function memsys_convert_vpn_to_pfn. Page size is defined to be 4KB.
   // NOTE: VPN_to_PFN operates at page granularity and returns page addr
 
-  p_lineaddr = memsys_convert_vpn_to_pfn(sys, v_lineaddr, core_id);
+  uns pfn = memsys_convert_vpn_to_pfn(sys, v_lineaddr, core_id);
+  // printf("%x\n", pfn);
+
   // p_lineaddr &= ~(PAGE_SIZE-1);
-  assert( (p_lineaddr & (PAGE_SIZE-1)) == 0);
+  // assert( (p_lineaddr & (PAGE_SIZE-1)) == 0);
+
+  p_lineaddr |= pfn;
   p_lineaddr |= v_lineaddr & (PAGE_SIZE-1);
- 
+
   if(type == ACCESS_TYPE_IFETCH){
-    Flag outcome=cache_access(sys->icache, p_lineaddr, FALSE, core_id);
-    if(outcome==MISS){
-      delay = ICACHE_HIT_LATENCY + memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
-      cache_install(sys->icache, p_lineaddr, FALSE, core_id);
-    }
-    else {
-      delay = ICACHE_HIT_LATENCY;
-    }
+    c = sys->icache_coreid[core_id];
+    delay = ICACHE_HIT_LATENCY;
+    write = FALSE;
   }
-    
 
-  if(type == ACCESS_TYPE_LOAD){
-    Flag outcome=cache_access(sys->dcache, p_lineaddr, FALSE, core_id);
-    if(outcome==MISS){
-      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
-      cache_install(sys->dcache, p_lineaddr, FALSE, core_id);
-
-      if (sys->dcache->last_evicted_line.dirty) {
-        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (p_lineaddr % sys->dcache->num_sets);
-        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
-      }
-    }
-    else {
-      delay = DCACHE_HIT_LATENCY;
-    }
+  else if(type == ACCESS_TYPE_LOAD){
+    c = sys->dcache_coreid[core_id];
+    delay = DCACHE_HIT_LATENCY;
+    write = FALSE;
   }
-  
 
-  if(type == ACCESS_TYPE_STORE){
-    Flag outcome=cache_access(sys->dcache, p_lineaddr, TRUE, core_id);
-    if(outcome==MISS){
-      delay = DCACHE_HIT_LATENCY + memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
-      cache_install(sys->dcache, p_lineaddr, TRUE, core_id);
+  else if(type == ACCESS_TYPE_STORE) {
+    c = sys->dcache_coreid[core_id];
+    delay = DCACHE_HIT_LATENCY;
+    write = TRUE;
+  }
 
-      if (sys->dcache->last_evicted_line.dirty) {
-        uns64 victim_lineaddr = (sys->dcache->last_evicted_line.tag * sys->dcache->num_sets) | (p_lineaddr % sys->dcache->num_sets);
-        memsys_L2_access(sys, victim_lineaddr, TRUE, sys->dcache->last_evicted_line.core_id);
-      }
-    }
-    else {
-      delay = DCACHE_HIT_LATENCY;
+  else{
+    fprintf(stderr, "INVALID INST TYPE\n");
+    assert(0);
+  }
+
+  Flag outcome=cache_access(c, p_lineaddr, write, core_id);
+  if(outcome==MISS){
+    delay += memsys_L2_access(sys, p_lineaddr, FALSE, core_id);
+    cache_install(c, p_lineaddr, write, core_id);
+
+    if (sys->dcache_coreid[core_id]->last_evicted_line.dirty) {
+      uns64 victim_lineaddr = (c->last_evicted_line.tag * c->num_sets) | 
+                              (p_lineaddr % c->num_sets);
+      // printf("%x\n", victim_lineaddr);
+
+      memsys_L2_access(sys, victim_lineaddr, TRUE, core_id);
     }
   }
  
