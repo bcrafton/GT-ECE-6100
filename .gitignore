@@ -3,6 +3,7 @@
 *.rpt
 *.o
 *.tar.gz
+*.res
 
 ignore/
 ignore/*
