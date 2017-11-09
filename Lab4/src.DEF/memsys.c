@@ -290,24 +290,19 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
   uns write;
   uns64 delay=0;
   Addr p_lineaddr=0;
-  
-  //   p_lineaddr=v_lineaddr;
 
   // TODO: First convert lineaddr from virtual (v) to physical (p) using the
   // function memsys_convert_vpn_to_pfn. Page size is defined to be 4KB.
   // NOTE: VPN_to_PFN operates at page granularity and returns page addr
 
-  uns64 pfn = memsys_convert_vpn_to_pfn(sys, v_lineaddr, core_id);  
-  pfn &= ~(uns64)(PAGE_SIZE/CACHE_LINESIZE-1);
-  assert( (pfn & (PAGE_SIZE/CACHE_LINESIZE-1)) == 0);
+  uns64 vpn = (v_lineaddr / (PAGE_SIZE/CACHE_LINESIZE));
+  uns64 pfn = memsys_convert_vpn_to_pfn(sys, vpn, core_id);
 
   uns64 offset = v_lineaddr & (PAGE_SIZE/CACHE_LINESIZE-1);
   assert(offset < (PAGE_SIZE/CACHE_LINESIZE));
 
-  p_lineaddr |= pfn;  
+  p_lineaddr = (pfn * (PAGE_SIZE/CACHE_LINESIZE));  
   p_lineaddr |= offset;
-
-  // assert(p_lineaddr == pfn);
 
   if(type == ACCESS_TYPE_IFETCH){
     c = sys->icache_coreid[core_id];
