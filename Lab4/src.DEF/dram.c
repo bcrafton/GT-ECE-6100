@@ -84,10 +84,18 @@ uns64   dram_access(DRAM *dram,Addr lineaddr, Flag is_dram_write){
 // Modify the function below only if you are attempting Part C 
 ///////////////////////////////////////////////////////////////////
 
+static int first = 1;
 uns64   dram_access_sim_rowbuf(DRAM *dram, Addr lineaddr, Flag is_dram_write){
   uns64 delay=0;
 
   static int open_rows[DRAM_BANKS] = {-1};
+  if (first) {
+    int i;
+    for(i=0;i<DRAM_BANKS; i++) {
+      open_rows[i] = -1;
+    }
+    first = 0;
+  }
 
   // Assume a mapping with consecutive lines in the same row
   // Assume a mapping with consecutive rowbufs in consecutive rows
@@ -97,19 +105,18 @@ uns64   dram_access_sim_rowbuf(DRAM *dram, Addr lineaddr, Flag is_dram_write){
   assert(bank_index < DRAM_BANKS);
   // [ which row in bank | bank id | which line in row ]
 
-  uns64 row_buf_index = lineaddr / (DRAM_BANKS * ROWBUF_SIZE / CACHE_LINESIZE);
+  uns64 row_buf_index = lineaddr / (ROWBUF_SIZE / CACHE_LINESIZE) / DRAM_BANKS;
   // assert(row_buf_index < );
   // [ which row in bank | bank id | which line in row ]
   // its a weird number for sure.
 
   // You need to write this fuction to track open rows 
-
-  if(open_rows[bank_index] == -1) {
+  if(open_rows[bank_index] == row_buf_index) {
+    delay = DRAM_T_CAS + DRAM_T_BUS;
+  }
+  else if(open_rows[bank_index] == -1) {
     open_rows[bank_index] = row_buf_index;
     delay = DRAM_T_ACT + DRAM_T_CAS + DRAM_T_BUS;
-  }
-  else if(open_rows[bank_index] == row_buf_index) {
-    delay = DRAM_T_CAS + DRAM_T_BUS;
   }
   else {
     open_rows[bank_index] = row_buf_index;

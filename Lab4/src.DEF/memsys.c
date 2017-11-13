@@ -302,6 +302,7 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
   assert(offset < (PAGE_SIZE/CACHE_LINESIZE));
 
   p_lineaddr = (pfn * (PAGE_SIZE/CACHE_LINESIZE));  
+  assert( (p_lineaddr & (PAGE_SIZE/CACHE_LINESIZE-1)) == 0);
   p_lineaddr |= offset;
 
   if(type == ACCESS_TYPE_IFETCH){
@@ -336,7 +337,7 @@ uns64 memsys_access_modeDEF(Memsys *sys, Addr v_lineaddr, Access_Type type,uns c
       uns64 victim_lineaddr = (c->last_evicted_line.tag * c->num_sets) | 
                               (p_lineaddr % c->num_sets);
 
-      memsys_L2_access(sys, victim_lineaddr, TRUE, core_id);
+      memsys_L2_access(sys, victim_lineaddr, TRUE, c->last_evicted_line.core_id);
     }
   }
  
@@ -359,7 +360,8 @@ uns64   memsys_L2_access(Memsys *sys, Addr lineaddr, Flag is_writeback, uns core
     cache_install(sys->l2cache, lineaddr, is_writeback, core_id);
 
     if (sys->l2cache->last_evicted_line.dirty) {
-      uns64 victim_lineaddr = (sys->l2cache->last_evicted_line.tag * sys->l2cache->num_sets) | (lineaddr % sys->l2cache->num_sets);
+      uns64 victim_lineaddr = (sys->l2cache->last_evicted_line.tag * sys->l2cache->num_sets) | 
+                              (lineaddr % sys->l2cache->num_sets);
       dram_access(sys->dram, victim_lineaddr, TRUE);
     }
   } 

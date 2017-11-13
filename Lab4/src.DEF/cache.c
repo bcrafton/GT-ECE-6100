@@ -69,23 +69,6 @@ void    cache_print_stats    (Cache *c, char *header){
 typedef unsigned int uint32_t;
 typedef unsigned long uint64_t;
 
-/*
-uint32_t log2_int(uint32_t num)
-{
-  uint32_t bit;
-  for(bit = 31; bit > 0; bit--)
-  {
-    uint32_t mask = 1 << bit;
-    if((mask & num) > 0)
-    {
-      return bit;
-    }
-  }
-  // log2 of 0 = 0 ?
-  return 0;
-}
-*/
-
 // there exists line size and cache size / assoc globals in sim.cpp
 Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   // Your Code Goes Here
@@ -112,7 +95,9 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
   for(i=0; i<c->num_ways; i++)
   {
     // not sure whether tag is the address or just tag bits of address.
-    if(c->sets[index].line[i].valid && (c->sets[index].line[i].tag == tag)) // == lineaddr
+    if(c->sets[index].line[i].valid && 
+      (c->sets[index].line[i].tag == tag) && 
+      (c->sets[index].line[i].core_id == core_id))
     {
       if (is_write) {
         c->sets[index].line[i].dirty = 1;
@@ -137,30 +122,6 @@ Flag cache_access(Cache *c, Addr lineaddr, uns is_write, uns core_id){
 // Install the line: determine victim using repl policy (LRU/RAND)
 // copy victim into last_evicted_line for tracking writebacks
 ////////////////////////////////////////////////////////////////////
-
-/*
-// there exists line size and cache size / assoc globals in sim.cpp
-uint32_t find_lru(Cache *c, uint32_t index)
-{
-  int lru = -1;
-  uint64_t oldest;
-
-  int i;
-  for(i=0; i<c->num_ways; i++)
-  {
-    if(!c->sets[index].line[i].valid)
-    {
-      return i;
-    }
-    else if(lru == -1 || (c->sets[index].line[i].last_access_time < oldest))
-    {
-      lru = i;
-      oldest = c->sets[index].line[i].last_access_time;
-    }
-  }
-  return lru;
-}
-*/
 
 // there exists line size and cache size / assoc globals in sim.cpp
 void cache_install(Cache *c, Addr lineaddr, uns is_write, uns core_id){
@@ -209,11 +170,7 @@ uns cache_find_victim(Cache *c, uns set_index, uns core_id){
     int i;
     for(i=0; i<c->num_ways; i++)
     {
-      if(!c->sets[set_index].line[i].valid)
-      {
-        return i;
-      }
-      else if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
+      if(lru == -1 || (c->sets[set_index].line[i].last_access_time < oldest))
       {
         lru = i;
         oldest = c->sets[set_index].line[i].last_access_time;
